@@ -1,8 +1,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
-
 #include <linux/platform_device.h>
-
+#include <linux/pruss.h>
 #include <linux/interrupt.h>
 #include <linux/irqreturn.h>
 
@@ -10,12 +9,18 @@
 
 struct pru_irq_data {
 	struct device *dev;
-	int irq;
+	int irq_from_pru;
+	int irq_to_pru;
 };
 
 irqreturn_t pru_irq_handler(int irq, void *data)
 {
-	pr_err("Interrupt from PRU received");
+	struct pru_irq_data *pi = data;
+	dev_dbg(pi->dev, "Interrupt from PRU received");
+
+	dev_dbg(pi->dev, "Sending interrupt to PRU");
+	pruss_intc_trigger(pi->irq_to_pru);
+
 	return IRQ_HANDLED;
 }
 
@@ -32,14 +37,18 @@ int pru_irq_probe(struct platform_device *pdev)
 
 	dev_set_drvdata(&pdev->dev, pi);
 
-	pi->irq = platform_get_irq_byname(pdev, "irq");
-	if (pi->irq < 0)
-		return pi->irq;
+	pi->irq_from_pru = platform_get_irq_byname(pdev, "irq_from_pru");
+	if (pi->irq_from_pru < 0)
+		return pi->irq_from_pru;
 
-	ret = devm_request_irq(&pdev->dev, pi->irq, pru_irq_handler,
-			IRQF_ONESHOT, dev_name(&pdev->dev), NULL);
+	pi->irq_to_pru = platform_get_irq_byname(pdev, "irq_to_pru");
+	if (pi->irq_to_pru < 0)
+		return pi->irq_to_pru;
 
-	pr_err("Probe success");
+	ret = devm_request_irq(&pdev->dev, pi->irq_from_pru, pru_irq_handler,
+			IRQF_ONESHOT, dev_name(&pdev->dev), pi);
+
+	dev_dbg(pi->dev, "Probe success");
 
 	return 0;
 }

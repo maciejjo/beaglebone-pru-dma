@@ -10,8 +10,8 @@
 			pru-irq {
 				compatible = "pru-irq";
 				interrupt-parent = <&pruss_intc>;
-				interrupts = <22>;
-				interrupt-names = "irq";
+				interrupts = <22>, <23>;
+				interrupt-names = "irq_from_pru", "irq_to_pru";
 			};
 		};
 	};

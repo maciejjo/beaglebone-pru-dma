@@ -1,7 +1,4 @@
 /*
- * Resource Table for PRU0 firmware of BeagleLogic
- * Copyright (C) 2017 Kumar Abhishek <abhishek@theembeddedkitchen.net>
- *
  * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
  *
  *
@@ -48,6 +45,7 @@
 
 /* Mapping sysevts to a channel. Each pair contains a sysevt, channel. */
 struct ch_map pru_intc_map[] = { {SYSEV_PRU0_TO_ARM_A, 4},
+				 {SYSEV_ARM_TO_PRU0_A, 0},
 };
 
 struct my_resource_table {
@@ -77,8 +75,8 @@ struct my_resource_table resourceTable = {
 		{ /* PRU_INTS version */
 			0x0000,
 			/* Channel-to-host mapping, 255 for unused */
-			HOST_UNUSED,HOST_UNUSED,HOST_UNUSED, HOST_UNUSED, 4, HOST_UNUSED,
-			HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED,
+			0, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, 4,
+			HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED,
 			/* Number of evts being mapped to channels */
 			(sizeof(pru_intc_map) / sizeof(struct ch_map)),
 			/* Pointer to the structure containing mapped events */
