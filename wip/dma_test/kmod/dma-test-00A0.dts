@@ -1,0 +1,17 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "ti,beaglebone", "ti,beaglebone-black", "ti,beaglebone-green";
+
+	fragment@0 {
+		target-path="/";
+		__overlay__ {
+			dma-test {
+				compatible = "dma-test";
+				dmas = <&edma 20 0>;
+				dma-names = "test_chan";
+			};
+		};
+	};
+};
