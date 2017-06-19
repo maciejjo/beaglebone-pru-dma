@@ -1,0 +1,19 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "ti,beaglebone", "ti,beaglebone-black", "ti,beaglebone-green";
+
+	fragment@0 {
+		target-path="/";
+		__overlay__ {
+			pru-dma-test {
+				compatible = "pru-dma-test";
+				pruss = <&pruss>;
+
+				dmas = <&edma 16 0>;
+				dma-names = "pru_test_chan";
+			};
+		};
+	};
+};
