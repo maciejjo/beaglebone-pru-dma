@@ -58,6 +58,9 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&pru_dma_pins>;
 				pruss = <&pruss>;
+				edma-channel = <12>;
+				edma-slot = <200>;
+				buffer-size = <100>;
 			};
 		};
 	};

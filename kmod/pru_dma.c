@@ -3,11 +3,15 @@
 #include <linux/pruss.h>
 #include <linux/rpmsg.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/of.h>
 
 #define DRV_NAME "pru_dma"
 
 struct pru_dma_data {
 	struct device *dev;
+	uint32_t edma_slot;
+	uint32_t edma_channel;
+	uint32_t buffer_size;
 };
 
 static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
@@ -21,15 +25,43 @@ static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
 static int pru_dma_probe(struct rpmsg_device *rpdev)
 {
 	struct pru_dma_data *pru_dma;
+	struct device_node *np = rpdev->dev.of_node;
 	int ret;
+
+	if (!np) {
+		dev_err(&rpdev->dev, "must be instantiated via devicetree\n");
+		return -ENOENT;
+	}
 
 	pru_dma = devm_kzalloc(&rpdev->dev, sizeof(*pru_dma), GFP_KERNEL);
 	if (!pru_dma)
 		return -ENOMEM;
 
+
 	pru_dma->dev = &rpdev->dev;
 
 	dev_set_drvdata(&rpdev->dev, pru_dma);
+
+	ret = of_property_read_u32(np, "edma-channel", &pru_dma->edma_channel);
+	if (ret) {
+		dev_err(pru_dma->dev, "invalid edma-channel in %s\n",
+				np->full_name);
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32(np, "edma-slot", &pru_dma->edma_slot);
+	if (ret) {
+		dev_err(pru_dma->dev, "invalid edma-channel in %s\n",
+				np->full_name);
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32(np, "buffer-size", &pru_dma->edma_slot);
+	if (ret) {
+		dev_err(pru_dma->dev, "invalid edma-channel in %s\n",
+				np->full_name);
+		return -EINVAL;
+	}
 
 	ret = rpmsg_send(rpdev->ept, "test", 4);
 	if (ret) {
