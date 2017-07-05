@@ -3,6 +3,7 @@
 #include <linux/pruss.h>
 #include <linux/rpmsg.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/dma-mapping.h>
 #include <linux/of.h>
 
 #define DRV_NAME "pru_dma"
@@ -11,7 +12,10 @@ struct pru_dma_data {
 	struct device *dev;
 	uint32_t edma_slot;
 	uint32_t edma_channel;
-	uint32_t buffer_size;
+	uint32_t kbuf_size;
+	uint32_t *kbuf;
+	dma_addr_t kbuf_dma;
+};
 };
 
 static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
@@ -27,6 +31,7 @@ static int pru_dma_probe(struct rpmsg_device *rpdev)
 	struct pru_dma_data *pru_dma;
 	struct device_node *np = of_find_node_by_name(NULL, "pru_dma");
 	int ret;
+	int i;
 
 	if (!np) {
 		dev_err(&rpdev->dev, "must be instantiated via devicetree\n");
@@ -63,19 +68,40 @@ static int pru_dma_probe(struct rpmsg_device *rpdev)
 		return -EINVAL;
 	}
 
-	ret = rpmsg_send(rpdev->ept, "test", 4);
+	pru_dma->kbuf = devm_kzalloc(pru_dma->dev,
+				pru_dma->kbuf_size * sizeof(uint32_t),
+				GFP_KERNEL);
+	if (!pru_dma->kbuf)
+		return -ENOMEM;
+
+	for (i = 0; i < pru_dma->kbuf_size; i++)
+		pru_dma->kbuf[i] =
+			1 << (i % 8);
+
+	pru_dma->kbuf_dma = dma_map_single(pru_dma->dev, pru_dma->kbuf,
+			pru_dma->kbuf_size, DMA_BIDIRECTIONAL);
+	ret = dma_mapping_error(pru_dma->dev, pru_dma->kbuf_dma);
 	if (ret) {
-		pr_err("rpmsg_send failed: %d\n", ret);
+		dev_err(pru_dma->dev, "Buffer DMA mapping failed");
 		return ret;
 	}
 
 	dev_dbg(pru_dma->dev, "Probe success");
 
 	return 0;
+
+rpmsg_fail:
+	dma_unmap_single(pru_dma->dev, pru_dma->kbuf_dma,
+			pru_dma->kbuf_size, DMA_BIDIRECTIONAL);
+	return ret;
 }
 
 static void pru_dma_remove(struct rpmsg_device *rpdev)
 {
+	struct pru_dma_data *pru_dma = dev_get_drvdata(&rpdev->dev);
+
+	dma_unmap_single(pru_dma->dev, pru_dma->kbuf_dma,
+			pru_dma->kbuf_size, DMA_BIDIRECTIONAL);
 }
 
 static struct rpmsg_device_id pru_dma_id_table[] = {
