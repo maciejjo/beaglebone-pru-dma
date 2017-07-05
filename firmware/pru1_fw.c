@@ -76,6 +76,7 @@ void main(void)
 	/* Clear EDMA event and transfer */
 	CT_INTC.SICR_bit.STS_CLR_IDX = EVT_FROM_EDMA;
 
+	edma_trigger(edma_ptr, &edma_buf);
 
 	/* Wait for event on channel 0 */
 	while(!(__R31 & HOST0_INT))
