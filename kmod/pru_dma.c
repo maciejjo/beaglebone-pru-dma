@@ -51,14 +51,14 @@ static int pru_dma_probe(struct rpmsg_device *rpdev)
 
 	ret = of_property_read_u32(np, "edma-slot", &pru_dma->edma_slot);
 	if (ret) {
-		dev_err(pru_dma->dev, "invalid edma-channel in %s\n",
+		dev_err(pru_dma->dev, "invalid edma-slot in %s\n",
 				np->full_name);
 		return -EINVAL;
 	}
 
 	ret = of_property_read_u32(np, "buffer-size", &pru_dma->edma_slot);
 	if (ret) {
-		dev_err(pru_dma->dev, "invalid edma-channel in %s\n",
+		dev_err(pru_dma->dev, "invalid buffer-size in %s\n",
 				np->full_name);
 		return -EINVAL;
 	}
