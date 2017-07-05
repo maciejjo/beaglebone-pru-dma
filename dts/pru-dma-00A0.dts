@@ -50,14 +50,13 @@
 	};
 
 	fragment@2 {
-		target-path="/";
+		target = <&pruss>;
 		__overlay__ {
-			/* Node for pru_dma kernel driver */
+			pinctrl-names = "default";
+			pinctrl-0 = <&pru_dma_pins>;
+
 			pru_dma {
 				compatible = "pru-dma";
-				pinctrl-names = "default";
-				pinctrl-0 = <&pru_dma_pins>;
-				pruss = <&pruss>;
 				edma-channel = <12>;
 				edma-slot = <200>;
 				buffer-size = <100>;
