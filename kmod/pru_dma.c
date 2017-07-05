@@ -61,7 +61,7 @@ static int pru_dma_probe(struct rpmsg_device *rpdev)
 		return -EINVAL;
 	}
 
-	ret = of_property_read_u32(np, "buffer-size", &pru_dma->edma_slot);
+	ret = of_property_read_u32(np, "buffer-size", &pru_dma->kbuf_size);
 	if (ret) {
 		dev_err(pru_dma->dev, "invalid buffer-size in %s\n",
 				np->full_name);
