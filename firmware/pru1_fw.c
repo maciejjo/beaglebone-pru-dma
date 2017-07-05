@@ -41,6 +41,9 @@ void main(void)
 	CT_INTC.SECR0 = 0xFFFFFFFF;
 	CT_INTC.SECR1 = 0xFFFFFFFF;
 
+
+	__R30 = 0x0;
+
 	status = &resourceTable.rpmsg_vdev.status;
 	while (!(*status & VIRTIO_CONFIG_S_DRIVER_OK));
 
@@ -64,10 +67,8 @@ void main(void)
 	edma_ptr = EDMA0_CC_BASE;
 
 	/* Write pattern to source buffer */
-	for (i = 0; i < 100; i++) {
-		*src = i % 2 ? 0x55555555 : 0xaaaaaaaa;
-		src++;
-	}
+	for (i = 0; i < 100; i++)
+		*(src + i) = i % 2 ? 0x55555555 : 0xaaaaaaaa;
 
 	/* Set up EDMA for transfer */
 	edma_setup(edma_ptr, &edma_buf);
@@ -75,8 +76,6 @@ void main(void)
 	/* Clear EDMA event and transfer */
 	CT_INTC.SICR_bit.STS_CLR_IDX = EVT_FROM_EDMA;
 
-	__R30 = 0xffff;
-	__delay_cycles(50000000);
 
 	/* Wait for event on channel 0 */
 	while(!(__R31 & HOST0_INT))
@@ -89,8 +88,7 @@ void main(void)
 		CT_INTC.SECR1 = (1U << 31);
 
 		for (i = 0; i < 100; i++) {
-			__R30 = *dst;
-			dst++;
+			__R30 = *(dst + i);
 			__delay_cycles(5000000);
 
 		}
