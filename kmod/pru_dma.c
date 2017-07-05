@@ -25,7 +25,7 @@ static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
 static int pru_dma_probe(struct rpmsg_device *rpdev)
 {
 	struct pru_dma_data *pru_dma;
-	struct device_node *np = rpdev->dev.of_node;
+	struct device_node *np = of_find_node_by_name(NULL, "pru_dma");
 	int ret;
 
 	if (!np) {
