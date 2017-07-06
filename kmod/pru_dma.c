@@ -16,6 +16,12 @@ struct pru_dma_data {
 	uint32_t *kbuf;
 	dma_addr_t kbuf_dma;
 };
+
+struct edma_tx_desc {
+	uint32_t kbuf_addr;
+	uint32_t kbuf_size;
+	uint8_t  edma_slot;
+	uint8_t  edma_chan;
 };
 
 static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
@@ -29,6 +35,7 @@ static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
 static int pru_dma_probe(struct rpmsg_device *rpdev)
 {
 	struct pru_dma_data *pru_dma;
+	struct edma_tx_desc tx_data;
 	struct device_node *np = of_find_node_by_name(NULL, "pru_dma");
 	int ret;
 	int i;
@@ -83,6 +90,19 @@ static int pru_dma_probe(struct rpmsg_device *rpdev)
 	ret = dma_mapping_error(pru_dma->dev, pru_dma->kbuf_dma);
 	if (ret) {
 		dev_err(pru_dma->dev, "Buffer DMA mapping failed");
+		return ret;
+	}
+
+	tx_data.kbuf_addr = pru_dma->kbuf_dma;
+	tx_data.kbuf_size = pru_dma->kbuf_size;
+	tx_data.edma_slot = pru_dma->edma_slot;
+	tx_data.edma_chan = pru_dma->edma_channel;
+
+	dev_dbg(pru_dma->dev, "Sending msg of size %d\n", sizeof(tx_data));
+	ret = rpmsg_send(rpdev->ept, &tx_data, sizeof(tx_data));
+	if (ret) {
+		pr_err("rpmsg_send failed: %d\n", ret);
+		goto rpmsg_fail;
 		return ret;
 	}
 
