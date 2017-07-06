@@ -58,9 +58,9 @@ void edma_setup(volatile uint32_t *edma_ptr, edma_data *edma_buf)
 	params.opt.tcinten = 1;
 	params.opt.itcchen = 1;
 
-	params.ccnt.ccnt = CCNT;
-	params.abcnt.acnt = ACNT;
+	params.abcnt.acnt = edma_buf->size * sizeof(uint32_t);
 	params.abcnt.bcnt = BCNT;
+	params.ccnt.ccnt = CCNT;
 	params.bidx.srcbidx = 0x1;
 	params.bidx.dstbidx = 0x1;
 	params.src = edma_buf->src;

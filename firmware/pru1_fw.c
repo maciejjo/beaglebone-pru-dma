@@ -21,13 +21,19 @@
 volatile register uint32_t __R30;
 volatile register uint32_t __R31;
 
-uint8_t payload[RPMSG_BUF_SIZE];
+struct edma_tx_desc {
+	uint32_t kbuf_addr;
+	uint32_t kbuf_size;
+	uint8_t  edma_slot;
+	uint8_t  edma_chan;
+};
 
 void main(void)
 {
 	edma_data edma_buf;
 	volatile uint32_t *edma_ptr;
 	volatile uint32_t *src, *dst;
+	struct edma_tx_desc tx_data;
 	int i;
 
 	struct pru_rpmsg_transport transport;
@@ -54,11 +60,20 @@ void main(void)
 	while (pru_rpmsg_channel(RPMSG_NS_CREATE, &transport, CHAN_NAME,
 				CHAN_DESC, CHAN_PORT) != PRU_RPMSG_SUCCESS);
 
+	while (!(__R31 & HOST1_INT))
+		;
+
+	CT_INTC.SICR_bit.STS_CLR_IDX = EVT_FROM_ARM_HOST;
+	while (pru_rpmsg_receive(&transport, &rpmsg_src, &rpmsg_dst, &tx_data, &rpmsg_len) == PRU_RPMSG_SUCCESS) {
+		pru_rpmsg_send(&transport, rpmsg_dst, rpmsg_src, &tx_data, rpmsg_len);
+	}
+
 	/* TODO: Buffer, channel and slot supplied by kernel module */
-	edma_buf.src = 0x4A310000;		
-	edma_buf.dst = 0x4A310100;	
-	edma_buf.chan = 12;
-	edma_buf.slot = 200;
+	edma_buf.src = tx_data.kbuf_addr;
+	edma_buf.dst = 0x4A310100;
+	edma_buf.chan = tx_data.edma_chan;
+	edma_buf.slot = tx_data.edma_slot;
+	edma_buf.size = tx_data.kbuf_size;
 
 	/* Poitners to source and destination buffer for pattern testing */
 	src = (uint32_t *) edma_buf.src;
@@ -66,9 +81,6 @@ void main(void)
 
 	edma_ptr = EDMA0_CC_BASE;
 
-	/* Write pattern to source buffer */
-	for (i = 0; i < 100; i++)
-		*(src + i) = i % 2 ? 0x55555555 : 0xaaaaaaaa;
 
 	/* Set up EDMA for transfer */
 	edma_setup(edma_ptr, &edma_buf);
@@ -88,7 +100,7 @@ void main(void)
 		/* Clear the EDMA event */
 		CT_INTC.SECR1 = (1U << 31);
 
-		for (i = 0; i < 100; i++) {
+		for (i = 0; i < edma_buf.size; i++) {
 			__R30 = *(dst + i);
 			__delay_cycles(5000000);
 
@@ -96,12 +108,4 @@ void main(void)
 
 	}
 
-	while (1) {
-		if (__R31 & HOST1_INT) {
-			CT_INTC.SICR_bit.STS_CLR_IDX = EVT_FROM_ARM_HOST;
-			while (pru_rpmsg_receive(&transport, &rpmsg_src, &rpmsg_dst, payload, &rpmsg_len) == PRU_RPMSG_SUCCESS) {
-				pru_rpmsg_send(&transport, rpmsg_dst, rpmsg_src, payload, rpmsg_len);
-			}
-		}
-	}
 }

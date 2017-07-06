@@ -37,6 +37,7 @@ typedef struct {
 	uint32_t dst;
 	uint32_t chan;
 	uint32_t slot;
+	uint16_t size;
 } edma_data;
 
 #define EDMA0_CC_BASE	((volatile uint32_t *)(0x49000000))
