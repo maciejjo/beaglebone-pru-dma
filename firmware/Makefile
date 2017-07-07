@@ -33,7 +33,7 @@ LIBS=--library=$(PRU_SSP)/lib/rpmsg_lib.lib
 INCLUDE=--include_path=$(PRU_SSP)/include --include_path=$(PRU_SSP)/include/am335x
 STACK_SIZE=0x100
 HEAP_SIZE=0x100
-GEN_DIR=gen
+GEN_DIR=obj
 
 #Common compiler and linker flags (Defined in 'PRU Optimizing C/C++ Compiler User's Guide)
 CFLAGS=-v3 -O2 --display_error_number --endian=little --hardware_mac=on --obj_directory=$(GEN_DIR) --pp_directory=$(GEN_DIR) -ppd -ppa
