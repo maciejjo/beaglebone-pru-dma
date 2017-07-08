@@ -1,5 +1,7 @@
 # Beaglebone PRU DMA support
 
+[![Build Status](https://travis-ci.org/maciejjo/beaglebone-pru-dma.svg?branch=master)](https://travis-ci.org/maciejjo/beaglebone-pru-dma)
+
 This project aims to provide support for bidirectional DMA transfers between
 PRU and Cortex-A8 on AM335x SoC. It is developed on BeagleBone Black.
 
