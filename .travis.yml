@@ -1,0 +1,103 @@
+language: c
+
+os:
+  - linux
+
+before_install:
+
+  - export TI_PRU_CGT_VERSION="2.1.5"
+  - export TI_PRU_CGT_DST="ti-pru-cgt"
+  - export TI_PRU_SWPKG_VERSION="v5.1.0"
+  - export TI_PRU_SWPKG_DST="pru-swpkg"
+
+  - export KERNEL_REPO="beagleboard/linux"
+  - export KERNEL_BRANCH="4.9.30"
+  - export KERNEL_VERSION="ti-r38"
+  - export KERNEL_DST="linux"
+
+  - export DTC_VERSION="1.4.4"
+  - export DTC_DST="dtc"
+
+  - export TOOLCHAIN_VERSION="6.3.1-2017.05"
+  - export TOOLCHAIN_DST="toolchain"
+
+  - export MAKE_JOBS="4"
+  - export ARM_MAKE="make CROSS_COMPILE=arm-linux-gnueabihf- ARCH=arm"
+
+  - export ROOT_DIR=${PWD}
+  - export DL_DIR="download"
+
+# Download sources #####################
+
+  - mkdir -p "${ROOT_DIR}/${DL_DIR}"
+  - wget -O "${ROOT_DIR}/${DL_DIR}/pru_cgt_installer" "http://software-dl.ti.com/codegen/esd/cgt_public_sw/PRU/${TI_PRU_CGT_VERSION}/ti_cgt_pru_${TI_PRU_CGT_VERSION}_linux_installer_x86.bin"
+  - wget -O "${ROOT_DIR}/${DL_DIR}/pru-swpkg.tar.gz"  "https://git.ti.com/pru-software-support-package/pru-software-support-package/archive-tarball/${TI_PRU_SWPKG_VERSION}"
+  - wget -O "${ROOT_DIR}/${DL_DIR}/linux.tar.gz"      "https://github.com/${KERNEL_REPO}/archive/${KERNEL_BRANCH}-${KERNEL_VERSION}.tar.gz"
+  - wget -O "${ROOT_DIR}/${DL_DIR}/dtc.tar.gz"        "https://git.kernel.org/pub/scm/utils/dtc/dtc.git/snapshot/dtc-${DTC_VERSION}.tar.gz"
+  - wget -O "${ROOT_DIR}/${DL_DIR}/toolchain.tar.xz"  "https://releases.linaro.org/components/toolchain/binaries/latest/arm-linux-gnueabihf/gcc-linaro-${TOOLCHAIN_VERSION}-x86_64_arm-linux-gnueabihf.tar.xz"
+########################################
+
+# Install required packages ############
+  - sudo apt-get update -qq
+  - sudo apt-get install bc gcc-multilib
+########################################
+
+before_script:
+
+# Install PRU crosstools ###############
+  - chmod +x ${ROOT_DIR}/${DL_DIR}/pru_cgt_installer
+  - ${ROOT_DIR}/${DL_DIR}/pru_cgt_installer <<<${TI_PRU_CGT_DST}
+########################################
+
+# Extract PRU SW package ###############
+  - mkdir -p ${ROOT_DIR}/${TI_PRU_SWPKG_DST}
+  - tar xf ${ROOT_DIR}/${DL_DIR}/pru-swpkg.tar.gz -C ${ROOT_DIR}/${TI_PRU_SWPKG_DST} --strip-components 1
+########################################
+
+# Install ARM crosstools ###############
+  - mkdir -p ${ROOT_DIR}/${TOOLCHAIN_DST}
+  - tar xf ${ROOT_DIR}/${DL_DIR}/toolchain.tar.xz -C ${ROOT_DIR}/${TOOLCHAIN_DST} --strip-components 1
+  - export PATH="${ROOT_DIR}/${TOOLCHAIN_DST}/bin:${PATH}"
+########################################
+
+# Build dtc ############################
+  - mkdir -p ${ROOT_DIR}/${DTC_DST}
+  - tar xf ${ROOT_DIR}/${DL_DIR}/dtc.tar.gz -C ${ROOT_DIR}/${DTC_DST} --strip-components 1
+  - cd ${ROOT_DIR}/${DTC_DST}
+  - make clean
+  - make PREFIX=/usr/local/
+  - sudo make PREFIX=/usr/local/ install
+########################################
+
+# Build kernel for external modules ####
+  - mkdir -p ${ROOT_DIR}/${KERNEL_DST}
+  - tar xf ${ROOT_DIR}/${DL_DIR}/linux.tar.gz -C ${ROOT_DIR}/${KERNEL_DST} --strip-components 1
+  - cd ${ROOT_DIR}/${KERNEL_DST}
+  - export LOCALVERSION="-${KERNEL_VERSION}"
+  - $ARM_MAKE -j${MAKE_JOBS} mrproper
+  - $ARM_MAKE bb.org_defconfig
+  - $ARM_MAKE -j${MAKE_JOBS} modules_prepare
+########################################
+
+script:
+
+# Build PRU firmware ###################
+  - cd ${ROOT_DIR}/firmware
+  - export PRU_CGT="${ROOT_DIR}/${TI_PRU_CGT_DST}"
+  - export PRU_SSP="${ROOT_DIR}/${TI_PRU_SWPKG_DST}"
+  - make clean
+  - make
+########################################
+
+# Build kernel module ##################
+  - cd ${ROOT_DIR}/kmod
+  - export KDIR="${ROOT_DIR}/${KERNEL_DST}"
+  - ${ARM_MAKE} -C $KDIR M=$PWD clean
+  - ${ARM_MAKE} -C $KDIR M=$PWD
+########################################
+
+# Build devicetree overlay #############
+  - cd ${ROOT_DIR}/dts
+  - make clean
+  - make
+########################################
