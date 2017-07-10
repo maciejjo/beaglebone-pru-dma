@@ -9,7 +9,7 @@ I am developing this project for [GSoC 2017][1] for [beagleboard.org][2].
 
 ## Task description
 
-*Goal*: Create a sample program to demostrate using EDMA on the PRU to transfer
+*Goal*: Create a sample program to demonstrate using EDMA on the PRU to transfer
 data to and from the main (DDR) memory with a Linux host. Most existing code
 utilizes (wastes) the 2nd PRU on the PRUSS for data xfer. Using DMA can allow
 the PRU to be used for other purposes.
