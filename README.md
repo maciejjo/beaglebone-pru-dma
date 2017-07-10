@@ -14,6 +14,21 @@ data to and from the main (DDR) memory with a Linux host. Most existing code
 utilizes (wastes) the 2nd PRU on the PRUSS for data xfer. Using DMA can allow
 the PRU to be used for other purposes.
 
+## Software requirements
+
+This application was developed and tested using following SW revisions:
+
+ - BBB:
+   - Beagleboard.org Debian, version 8.8
+   - linux: 4.9.30-ti-r38
+ - Host:
+   - toolchain: arm-linux-gnueabihf gcc linaro 6.3.1-2017.05
+   - dtc: 1.4.4
+   - PRU CGT: 2.1.5
+   - PRU Software Support Package: v5.1.0
+
+To work properly, PRU remoteproc must be enabled in device tree.
+
 ## Project structure
 
 wip - (work in progress) contains isolated examples created to test specific
