@@ -52,12 +52,21 @@ Following scenario is implemented:
 
 ## Project structure
 
-wip - (work in progress) contains isolated examples created to test specific
-feature.
+ - *kmod* - kernel module, responsible for allocation and mapping of linux-side
+   DMA buffer and passing parameters to PRU firmware via rpmsg.
 
-kmod - contains kernel part of the project
+ - firmware - code for PRU software. Receives transfer parameters via rpmsg,
+   configures EDMA for transfer and INTC to trigger event on EDMA interrupt.
 
-firmware - contains PRU part of the project
+ - *dts* - device tree overlay needed to run the code. Contains EDMA
+   configuration parameters (channel number, PaRAM slot).
+
+ - *examples* - every subdirectory is an example usage of pru-dma, demonstrating
+   practical application.
+
+ - *wip* - (work in progress) isolated examples created to test specific
+   features (e.g. linux DMA API, PRU-ARM communication), not an essential part
+   of the project.
 
 [1]: https://summerofcode.withgoogle.com/projects/#5021339281784832
 [2]: https://beagleboard.org/
