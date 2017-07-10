@@ -55,7 +55,7 @@ Following scenario is implemented:
  - *kmod* - kernel module, responsible for allocation and mapping of linux-side
    DMA buffer and passing parameters to PRU firmware via rpmsg.
 
- - firmware - code for PRU software. Receives transfer parameters via rpmsg,
+ - *firmware* - code for PRU software. Receives transfer parameters via rpmsg,
    configures EDMA for transfer and INTC to trigger event on EDMA interrupt.
 
  - *dts* - device tree overlay needed to run the code. Contains EDMA
