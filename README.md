@@ -29,6 +29,27 @@ This application was developed and tested using following SW revisions:
 
 To work properly, PRU remoteproc must be enabled in device tree.
 
+## Implementation overview
+
+Implementation of the project is split in two main parts, kernel module and PRU
+firmware. For PRU management, remoteproc framework is employed, and for
+communication (to pass configuration data for DMA transfers) remote processor
+messaging framework (rpmsg) is utilized.
+
+Following scenario is implemented:
+
+ - Driver performs buffer allocation (using kzalloc call) to obtain contiguous
+   buffer in memory,
+ - Buffer is then mapped using dma_map_single call to ensure the address is in
+   DMA able region and caching is turned off for the buffer,
+ - Transfer descriptor (struct edma_tx_desc) is created, which contains buffer
+   address and size, and EDMA channel parameters,
+ - The descriptor is then passed to PRU using rpmsg,
+ - PRU configures EDMA based on the transfer descriptor and schedules the
+   transfer by writing to EDMA registers,
+ - PRU polls periodically for the transfer completion event,
+ - once the transfer is complete, driver is interrupted via rpmsg.
+
 ## Project structure
 
 wip - (work in progress) contains isolated examples created to test specific
