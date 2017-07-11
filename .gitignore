@@ -58,7 +58,7 @@ dkms.conf
 # End of https://www.gitignore.io/api/c
 
 # Build artifacts directory
-obj/
+gen/
 
 # dtc output
 *.dtb
