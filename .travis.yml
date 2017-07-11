@@ -82,7 +82,7 @@ before_script:
 script:
 
 # Build PRU firmware ###################
-  - cd ${ROOT_DIR}/firmware
+  - cd ${ROOT_DIR}/firmware/lib/pru_dma_lib
   - export PRU_CGT="${ROOT_DIR}/${TI_PRU_CGT_DST}"
   - export PRU_SSP="${ROOT_DIR}/${TI_PRU_SWPKG_DST}"
   - make clean
