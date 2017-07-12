@@ -101,3 +101,9 @@ script:
   - make clean
   - make
 ########################################
+
+# Build example 01 #####################
+  - cd ${ROOT_DIR}/examples/01_leds/firmware
+  - make clean
+  - make
+########################################
