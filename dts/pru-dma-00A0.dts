@@ -60,6 +60,7 @@
 				edma-channel = <12>;
 				edma-slot = <200>;
 				buffer-size = <100>;
+				chan-name= "pru-dma";
 			};
 		};
 	};
