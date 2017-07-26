@@ -11,8 +11,8 @@ before_install:
   - export TI_PRU_SWPKG_DST="pru-swpkg"
 
   - export KERNEL_REPO="beagleboard/linux"
-  - export KERNEL_BRANCH="4.9.30"
-  - export KERNEL_VERSION="ti-r38"
+  - export KERNEL_BRANCH="4.9.36"
+  - export KERNEL_VERSION="ti-r46"
   - export KERNEL_DST="linux"
 
   - export DTC_VERSION="1.4.4"
