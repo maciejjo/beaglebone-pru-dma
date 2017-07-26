@@ -1,0 +1,59 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "ti,beaglebone", "ti,beaglebone-black", "ti,beaglebone-green";
+
+	exclusive-use =
+		/* the pin header P8 uses */
+		"P8.27",
+		"P8.28";
+
+
+	fragment@0 {
+		target = <&edma>;
+
+		__overlay__ {
+			/* Reserve PaRAM slot for PRU use -
+			 * won't be used in linux transfers.
+			 * 200 is slot number and 1 means we
+			 * only want one slot.
+			 */
+			ti,edma-reserved-slot-ranges = <200 1>;
+		};
+	};
+
+	fragment@1 {
+		target = <&am33xx_pinmux>;
+		__overlay__ {
+			pru_dma_pins: pinmux_pru_dma {
+				/* Set P8.27 as PRU1 output */
+				/* Set P8.28 as PRU1 intput */
+				pinctrl-single,pins = <
+					0x0e0 0x5
+					0x0e8 0x26
+					>;
+			};
+		};
+	};
+
+	fragment@2 {
+		target = <&pruss>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&pru_dma_pins>;
+
+			pru_dma {
+				compatible = "pru-dma";
+				edma-channel = <12>;
+				edma-slot = <200>;
+				buffer-size = <100>;
+				chan-name = "pru-dma";
+			};
+
+			pru_dma_hcsr04 {
+				compatible = "pru-dma-hcsr04";
+			};
+		};
+	};
+};
