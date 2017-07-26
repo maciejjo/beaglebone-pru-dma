@@ -17,7 +17,13 @@ struct pru_dma_data {
 	uint32_t size;
 };
 
+enum pru_dma_direction {
+	PRU_DMA_DIR_ARM_TO_PRU,
+	PRU_DMA_DIR_PRU_TO_ARM,
+};
+
 void pru_dma_init(struct pru_dma_data *dma_data,
+			enum pru_dma_direction dir,
 			struct fw_rsc_vdev *rpmsg_vdev,
 			struct fw_rsc_vdev_vring *rpmsg_vring0,
 			struct fw_rsc_vdev_vring *rpmsg_vring1);

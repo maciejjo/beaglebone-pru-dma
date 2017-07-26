@@ -21,6 +21,7 @@ void main(void)
 		__R30 = 0x00;
 
 		pru_dma_init(&dma_data,
+				PRU_DMA_DIR_ARM_TO_PRU,
 				&resourceTable.rpmsg_vdev,
 				&resourceTable.rpmsg_vring0,
 				&resourceTable.rpmsg_vring1

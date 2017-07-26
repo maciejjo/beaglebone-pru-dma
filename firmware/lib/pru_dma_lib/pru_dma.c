@@ -13,7 +13,6 @@
 #define PRU_DMA_IS_TX_COMPLETE() ((__R31 & HOST0_INT) && CHECK_EVT(EVT_FROM_EDMA))
 #define PRU_DMA_TX_ACK()         (CLEAR_EVT(EVT_FROM_EDMA))
 
-
 static volatile uint32_t *edma_ptr;
 static struct pru_rpmsg_transport transport;
 static uint16_t rpmsg_src, rpmsg_dst, rpmsg_len;
@@ -30,6 +29,7 @@ static struct pru_dma_tx_desc tx_desc;
 static edma_data edma_buf;
 
 void pru_dma_init(struct pru_dma_data *dma_data,
+			enum pru_dma_direction dir,
 			struct fw_rsc_vdev *rpmsg_vdev,
 			struct fw_rsc_vdev_vring *rpmsg_vring0,
 			struct fw_rsc_vdev_vring *rpmsg_vring1)
@@ -64,8 +64,14 @@ void pru_dma_init(struct pru_dma_data *dma_data,
 						&rpmsg_len) ==
 					PRU_RPMSG_SUCCESS) {
 
-				edma_buf.src = tx_desc.kbuf_addr;
-				edma_buf.dst = PRU_SHMEM_OFFSET;
+				if (dir == PRU_DMA_DIR_ARM_TO_PRU) {
+					edma_buf.src = tx_desc.kbuf_addr;
+					edma_buf.dst = PRU_SHMEM_OFFSET;
+				} else {
+					edma_buf.src = PRU_SHMEM_OFFSET;
+					edma_buf.dst = tx_desc.kbuf_addr;
+				}
+
 				edma_buf.chan = tx_desc.edma_chan;
 				edma_buf.slot = tx_desc.edma_slot;
 				edma_buf.size = tx_desc.kbuf_size;
