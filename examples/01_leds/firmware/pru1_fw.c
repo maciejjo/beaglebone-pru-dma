@@ -15,32 +15,31 @@ void main(void)
 	/* Clear SYSCFG[STANDBY_INIT] to enable OCP master port */
 	CT_CFG.SYSCFG_bit.STANDBY_INIT = 0;
 
-	/* Clear all system events */
-	CT_INTC.SECR0 = 0xFFFFFFFF;
-	CT_INTC.SECR1 = 0xFFFFFFFF;
+	while (1) {
 
-	/* Clear all GPO pins */
-	__R30 = 0x0;
+		/* Clear all GPO pins */
+		__R30 = 0x00;
 
-	pru_dma_init(&dma_data,
-			&resourceTable.rpmsg_vdev,
-			&resourceTable.rpmsg_vring0,
-			&resourceTable.rpmsg_vring1
-			);
+		pru_dma_init(&dma_data,
+				&resourceTable.rpmsg_vdev,
+				&resourceTable.rpmsg_vring0,
+				&resourceTable.rpmsg_vring1
+				);
 
-	/* Poitner to destination buffer for pattern testing */
-	dst = (uint32_t *) dma_data.dst,
+		/* Poitner to destination buffer for pattern testing */
+		dst = (uint32_t *) dma_data.dst;
 
-	pru_dma_trigger(),
+		pru_dma_trigger();
 
-	/* Check if event from EDMA arrived, when so, push content of memory to
-	 * LEDs
-	 */
-	pru_dma_wait();
+		/* Check if event from EDMA arrived, when so, push content of memory to
+		 * LEDs
+		 */
+		pru_dma_wait();
 
-	for (i = 0; i < dma_data.size; i++) {
-		__R30 = *(dst + i);
-		__delay_cycles(5000000);
+		for (i = 0; i < dma_data.size; i++) {
+			__R30 = *(dst + i);
+			__delay_cycles(5000000);
 
+		}
 	}
 }
