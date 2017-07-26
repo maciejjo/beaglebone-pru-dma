@@ -38,7 +38,8 @@ int pru_dma_leds_probe(struct platform_device *pdev)
 
 	if (IS_ERR(pru_dma_leds->pru_dma)) {
 		ret = PTR_ERR(pru_dma_leds->pru_dma);
-		dev_err(pru_dma_leds->dev, "Unable to get pru_dma handle.\n");
+		if (ret != -EPROBE_DEFER)
+			dev_err(pru_dma_leds->dev, "Unable to get pru_dma handle.\n");
 		return ret;
 	}
 
