@@ -11,6 +11,33 @@ struct pru_dma_leds {
 	struct pru_dma *pru_dma;
 };
 
+static ssize_t pru_dma_leds_tx_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	struct pru_dma_leds *pru_dma_leds =
+		platform_get_drvdata(to_platform_device(dev));
+
+	ret = pru_dma_tx_trigger(pru_dma_leds->pru_dma);
+	if (ret)
+		return ret;
+
+	dev_err(pru_dma_leds->dev, "Tx triggered.\n");
+
+	return count;
+}
+
+static DEVICE_ATTR(tx, S_IWUSR, NULL, pru_dma_leds_tx_store);
+
+static struct attribute *pru_dma_leds_attributes[] = {
+	&dev_attr_tx.attr,
+	NULL,
+};
+
+static const struct attribute_group pru_dma_leds_group = {
+		.attrs = pru_dma_leds_attributes,
+};
+
 static void leds_pattern_generate(uint32_t *buf, uint32_t size)
 {
 	int i;
@@ -61,14 +88,12 @@ int pru_dma_leds_probe(struct platform_device *pdev)
 
 	dev_err(pru_dma_leds->dev, "Mapped buffer!.\n");
 
-	ret = pru_dma_tx_trigger(pru_dma_leds->pru_dma);
+	ret = sysfs_create_group(&pdev->dev.kobj, &pru_dma_leds_group);
 	if (ret) {
-		pru_dma_unmap_buffer(pru_dma_leds->pru_dma);
+		dev_err(&pdev->dev, "sysfs_create_group() failed (%d)\n",
+				ret);
 		return ret;
 	}
-
-	dev_err(pru_dma_leds->dev, "Tx triggered.\n");
-
 
 	dev_dbg(pru_dma_leds->dev, "Probe success");
 	return 0;
@@ -79,6 +104,8 @@ int pru_dma_leds_remove(struct platform_device *pdev)
 	struct pru_dma_leds *pru_dma_leds = dev_get_drvdata(&pdev->dev);
 
 	pru_dma_unmap_buffer(pru_dma_leds->pru_dma);
+
+	sysfs_remove_group(&pdev->dev.kobj, &pru_dma_leds_group);
 
 	dev_err(pru_dma_leds->dev, "Unmapped buffer.\n");
 	return 0;
