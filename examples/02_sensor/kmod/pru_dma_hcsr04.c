@@ -41,6 +41,8 @@ static ssize_t pru_dma_hcsr04_buf_show(struct device *dev,
 	struct pru_dma_hcsr04 *pru_dma_hcsr04 =
 		platform_get_drvdata(to_platform_device(dev));
 
+	pru_dma_tx_completion_wait(pru_dma_hcsr04->pru_dma);
+
 	dma_buf = pru_dma_get_buffer(pru_dma_hcsr04->pru_dma);
 	dma_buf_size = pru_dma_get_buffer_size(pru_dma_hcsr04->pru_dma);
 
