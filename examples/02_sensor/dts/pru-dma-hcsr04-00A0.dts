@@ -49,6 +49,7 @@
 				edma-slot = <200>;
 				buffer-size = <100>;
 				chan-name = "pru-dma";
+				notify-completion = <1>;
 			};
 
 			pru_dma_hcsr04 {

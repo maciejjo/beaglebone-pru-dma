@@ -60,6 +60,7 @@
 				edma-slot = <200>;
 				buffer-size = <100>;
 				chan-name = "pru-dma";
+				notify-completion = <0>;
 			};
 
 			pru_dma_leds {
