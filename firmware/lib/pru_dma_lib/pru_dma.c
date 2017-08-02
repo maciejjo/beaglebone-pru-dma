@@ -23,7 +23,12 @@ struct pru_dma_tx_desc {
 	uint32_t kbuf_size;
 	uint8_t  edma_slot;
 	uint8_t  edma_chan;
+	uint8_t  flags;
 };
+
+#define TX_DESC_FLAGS_NOTIFY_COMPLETION (1 << 0)
+
+#define PRU_DMA_TX_COMPLETED (uint8_t) (0x01)
 
 static struct pru_dma_tx_desc tx_desc;
 static edma_data edma_buf;
@@ -98,11 +103,25 @@ void pru_dma_trigger()
 	edma_trigger(edma_ptr, &edma_buf);
 }
 
-void pru_dma_wait()
+static void pru_dma_ack()
 {
-	while(!PRU_DMA_IS_TX_COMPLETE())
-		;
+	uint8_t msg = PRU_DMA_TX_COMPLETED;
+	uint16_t len = sizeof(msg);
 
 	PRU_DMA_TX_ACK();
+
+	if (tx_desc.flags & TX_DESC_FLAGS_NOTIFY_COMPLETION)
+		pru_rpmsg_send(&transport, rpmsg_dst, rpmsg_src, &msg,
+				len);
+}
+
+void pru_dma_wait()
+{
+	while(1) {
+		if (PRU_DMA_IS_TX_COMPLETE() && edma_check(edma_ptr, &edma_buf)) {
+			pru_dma_ack();
+			break;
+		}
+	}
 }
 
