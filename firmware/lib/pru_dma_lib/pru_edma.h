@@ -44,3 +44,5 @@ typedef struct {
 
 void edma_setup(volatile uint32_t *edma_ptr, edma_data *edma_buf);
 void edma_trigger(volatile uint32_t *edma_ptr, edma_data *edma_buf);
+int edma_check(volatile uint32_t *edma_ptr, edma_data *edma_buf);
+

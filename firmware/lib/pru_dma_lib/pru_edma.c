@@ -82,4 +82,12 @@ void edma_trigger(volatile uint32_t *edma_ptr, edma_data *edma_buf)
 	edma_ptr[ESR] = (CHAN_MASK(edma_buf->chan));
 }
 
+int edma_check(volatile uint32_t *edma_ptr, edma_data *edma_buf)
+{
+	/* Check transfer completion */
+	if (edma_ptr[IPR] & CHAN_MASK(edma_buf->chan))
+		return 1;
+
+	return 0;
+}
 
