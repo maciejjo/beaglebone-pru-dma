@@ -36,6 +36,8 @@ static ssize_t pru_dma_hcsr04_buf_show(struct device *dev,
 	uint32_t dma_buf_size;
 	int i;
 	int len = 0;
+	uint32_t mean = 0;
+
 	struct pru_dma_hcsr04 *pru_dma_hcsr04 =
 		platform_get_drvdata(to_platform_device(dev));
 
@@ -45,7 +47,12 @@ static ssize_t pru_dma_hcsr04_buf_show(struct device *dev,
 	dev_err(pru_dma_hcsr04->dev, "Buffer obtained.\n");
 
 	for (i = 0; i < dma_buf_size; i++)
-		len += sprintf(buf + len, "%u ", *(dma_buf + i));
+		mean += *(dma_buf + i);
+
+	mean *= 1000;
+	mean /= (291 * 2 * dma_buf_size);
+
+	len = sprintf(buf, "%umm\n", mean);
 
 	return len;
 }
