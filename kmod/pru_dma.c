@@ -19,6 +19,7 @@ struct pru_dma {
 	uint32_t *kbuf;
 	dma_addr_t kbuf_dma;
 	const char *chan_name;
+	uint32_t notify;
 };
 
 struct edma_tx_desc {
@@ -26,7 +27,12 @@ struct edma_tx_desc {
 	uint32_t kbuf_size;
 	uint8_t  edma_slot;
 	uint8_t  edma_chan;
+	uint8_t  flags;
 };
+
+#define TX_DESC_FLAGS_NOTIFY_COMPLETION (1 << 0)
+
+#define PRU_DMA_TX_COMPLETED (uint8_t) (0x01)
 
 static DEFINE_MUTEX(pru_dma_list_mutex);
 static LIST_HEAD(pru_dma_list);
@@ -75,6 +81,7 @@ int pru_dma_tx_trigger(struct pru_dma *pru_dma)
 	tx_data.kbuf_size = pru_dma->kbuf_size;
 	tx_data.edma_slot = pru_dma->edma_slot;
 	tx_data.edma_chan = pru_dma->edma_channel;
+	tx_data.flags     = pru_dma->notify ? (TX_DESC_FLAGS_NOTIFY_COMPLETION) : (0x00);
 
 	dev_dbg(pru_dma->dev, "Sending msg of size %d\n", sizeof(tx_data));
 	ret = rpmsg_send(pru_dma->rpdev->ept, &tx_data, sizeof(tx_data));
@@ -167,6 +174,13 @@ static int pru_dma_probe(struct rpmsg_device *rpdev)
 	ret = of_property_read_string(np, "chan-name", &pru_dma->chan_name);
 	if (ret) {
 		dev_err(pru_dma->dev, "invalid chan-name in %s\n",
+				np->full_name);
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32(np, "notify-completion", &pru_dma->notify);
+	if (ret) {
+		dev_err(pru_dma->dev, "invalid notify-completion in %s\n",
 				np->full_name);
 		return -EINVAL;
 	}
