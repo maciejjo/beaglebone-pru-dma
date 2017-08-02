@@ -5,6 +5,7 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/dma-mapping.h>
 #include <linux/of.h>
+#include <linux/completion.h>
 #include <linux/pru_dma.h>
 
 #define DRV_NAME "pru_dma"
@@ -20,6 +21,7 @@ struct pru_dma {
 	dma_addr_t kbuf_dma;
 	const char *chan_name;
 	uint32_t notify;
+	struct completion tx_complete;
 };
 
 struct edma_tx_desc {
@@ -90,9 +92,24 @@ int pru_dma_tx_trigger(struct pru_dma *pru_dma)
 		return ret;
 	}
 
+	if (pru_dma->notify)
+		init_completion(&pru_dma->tx_complete);
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pru_dma_tx_trigger);
+
+int pru_dma_tx_completion_wait(struct pru_dma *pru_dma)
+{
+	if (pru_dma->notify) {
+		wait_for_completion(&pru_dma->tx_complete);
+		return 0;
+	} else {
+		pr_err("TX completion notification disabled\n");
+		return -1;
+	}
+}
+EXPORT_SYMBOL_GPL(pru_dma_tx_completion_wait);
 
 struct pru_dma *pru_dma_get(char *chan_name)
 {
@@ -125,8 +142,16 @@ EXPORT_SYMBOL_GPL(pru_dma_put);
 static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
 						void *priv, u32 src)
 {
+	struct pru_dma *pru_dma = dev_get_drvdata(&rpdev->dev);
+
 	print_hex_dump(KERN_INFO, "incoming message:", DUMP_PREFIX_NONE,
 						16, 1, data, len, true);
+
+	if (pru_dma->notify && len == 1 &&
+			*(uint8_t *)data == PRU_DMA_TX_COMPLETED) {
+		complete(&pru_dma->tx_complete);
+	}
+
 	return 0;
 }
 

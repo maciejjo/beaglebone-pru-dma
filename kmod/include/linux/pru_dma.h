@@ -13,5 +13,6 @@ int pru_dma_map_buffer(struct pru_dma *pru_dma);
 void pru_dma_unmap_buffer(struct pru_dma *pru_dma);
 
 int pru_dma_tx_trigger(struct pru_dma *pru_dma);
+int pru_dma_tx_completion_wait(struct pru_dma *pru_dma);
 
 #endif /* __LINUX_PRU_DMA_H */
