@@ -1,0 +1,54 @@
+From f1f0948493409c21b246728bbcfb96aac3bedc7d Mon Sep 17 00:00:00 2001
+From: Maciej Sobkowski <maciej@sobkow.ski>
+Date: Wed, 16 Aug 2017 17:01:19 +0200
+Subject: [PATCH 2/3] Add new resource structures for pru dma
+
+This structures describe custom resource from pru firmware resource
+table used to configure dma channels
+
+Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
+---
+ drivers/remoteproc/pru_rproc.h | 15 +++++++++++++++
+ drivers/remoteproc/pruss.h     |  2 ++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/drivers/remoteproc/pru_rproc.h b/drivers/remoteproc/pru_rproc.h
+index 23c4c02..98e1c5b 100644
+--- a/drivers/remoteproc/pru_rproc.h
++++ b/drivers/remoteproc/pru_rproc.h
+@@ -90,4 +90,19 @@ struct fw_rsc_custom_intrmap {
+ 	struct pruss_event_chnl *event_chnl_map;
+ };
+ 
++struct dma_ch {
++	//buffer address (filled by host), EDMA channel, EDMA PaRAM slot, buffer size, completion
++	u32 buf_addr;
++	u32 buf_size;
++	u8 edma_channel;
++	u8 param_slot;
++	u8 notify_completion;
++};
++
++struct fw_rsc_custom_dma_ch {
++	u16 version;
++	u32 dma_ch_size;
++	struct dma_ch *dma_ch;
++};
++
+ #endif	/* _PRU_REMOTEPROC_H_ */
+diff --git a/drivers/remoteproc/pruss.h b/drivers/remoteproc/pruss.h
+index ae23778..cabe82b 100644
+--- a/drivers/remoteproc/pruss.h
++++ b/drivers/remoteproc/pruss.h
+@@ -34,6 +34,8 @@
+ /* maximum number of host interrupts */
+ #define MAX_PRU_HOST_INT	10
+ 
++#define MAX_PRU_DMA_CHANS	10
++
+ /* PRU_ICSS_INTC registers */
+ #define PRU_INTC_REVID		0x0000
+ #define PRU_INTC_CR		0x0004
+-- 
+2.14.0
+

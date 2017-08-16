@@ -1,0 +1,114 @@
+From f308f44da33824ba6e1f0dd49fb5799b6f708f88 Mon Sep 17 00:00:00 2001
+From: Maciej Sobkowski <maciej@sobkow.ski>
+Date: Wed, 16 Aug 2017 17:01:45 +0200
+Subject: [PATCH 3/3] Add parsing of PRU_DMA resource type to pru_rproc
+
+DMA buffers are set up based on resource table from firmware during PRU
+configuration, before boot. Add new custom resource type which will
+represent this resource type in the table.
+
+Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
+---
+ drivers/remoteproc/pru_rproc.c | 57 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/remoteproc/pru_rproc.h |  3 ++-
+ 2 files changed, 59 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/remoteproc/pru_rproc.c b/drivers/remoteproc/pru_rproc.c
+index e8c1a80..404d6fe 100644
+--- a/drivers/remoteproc/pru_rproc.c
++++ b/drivers/remoteproc/pru_rproc.c
+@@ -23,6 +23,7 @@
+ #include <linux/of_device.h>
+ #include <linux/remoteproc.h>
+ #include <linux/pruss.h>
++#include <linux/pru_dma.h>
+ 
+ #include "remoteproc_internal.h"
+ #include "pruss.h"
+@@ -621,6 +622,58 @@ static int pru_handle_custom_intrmap(struct rproc *rproc,
+ 	return ret;
+ }
+ 
++/*
++ * parse the custom interrupt map resource and configure the INTC
++ * appropriately
++ */
++static int pru_handle_custom_dma_channels(struct rproc *rproc,
++				     struct fw_rsc_custom_dma_ch *dma_rsc)
++{
++	struct device *dev = rproc->dev.parent;
++	int i;
++	uint32_t buf_addr;
++	uint32_t buf_size;
++	uint8_t notify_completion;
++	struct dma_ch *dma_ch = dma_rsc->dma_ch;
++	struct pru_dma *pru_dma;
++	int ret;
++
++	if (dma_rsc->version != 0) {
++		dev_err(dev, "only custom ints resource version 0 supported\n");
++		return -EINVAL;
++	}
++
++	if (dma_rsc->dma_ch_size < 0 ||
++	    dma_rsc->dma_ch_size >= MAX_PRU_DMA_CHANS) {
++		dev_err(dev, "custom ints resource has more DMA channels then allowed\n");
++		return -EINVAL;
++	}
++	/* parse and fill in system event to interrupt channel mapping */
++	for (i = 0; i < dma_rsc->dma_ch_size; i++) {
++		buf_addr = dma_ch[i].buf_addr;
++		buf_size = dma_ch[i].buf_size;
++		notify_completion = dma_ch[i].notify_completion;
++
++		pru_dma = pru_dma_get("pru-dma");
++
++		if (IS_ERR(pru_dma)) {
++			ret = PTR_ERR(pru_dma);
++			if (ret != -EPROBE_DEFER)
++				dev_err(dev, "Unable to get pru_dma handle.\n");
++			return ret;
++		}
++
++		if ((ret = pru_dma_buffer_setup(pru_dma, &buf_addr, buf_size, notify_completion, i))) {
++			dev_err(dev, "Error while setting up DMA buffer %u\n", i);
++			return ret;
++		}
++
++		pru_dma_put(pru_dma);
++	}
++
++	return 0;
++}
++
+ /* PRU-specific post loading custom resource handler */
+ static int pru_rproc_handle_custom_rsc(struct rproc *rproc,
+ 				       struct fw_rsc_custom *rsc)
+@@ -633,6 +686,10 @@ static int pru_rproc_handle_custom_rsc(struct rproc *rproc,
+ 		ret = pru_handle_custom_intrmap(rproc,
+ 						(struct fw_rsc_custom_intrmap *)
+ 						rsc->data);
++	case PRUSS_RSC_DMA:
++		ret = pru_handle_custom_dma_channels(rproc,
++						(struct fw_rsc_custom_dma_ch *)
++						rsc->data);
+ 		break;
+ 	default:
+ 		dev_err(dev, "%s: handling unknown type %d\n", __func__,
+diff --git a/drivers/remoteproc/pru_rproc.h b/drivers/remoteproc/pru_rproc.h
+index 98e1c5b..a1c877d 100644
+--- a/drivers/remoteproc/pru_rproc.h
++++ b/drivers/remoteproc/pru_rproc.h
+@@ -45,7 +45,8 @@
+  */
+ enum pruss_rsc_types {
+ 	PRUSS_RSC_INTRS	= 1,
+-	PRUSS_RSC_MAX	= 2,
++	PRUSS_RSC_DMA	= 2,
++	PRUSS_RSC_MAX	= 3,
+ };
+ 
+ /**
+-- 
+2.14.0
+
