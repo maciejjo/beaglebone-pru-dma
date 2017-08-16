@@ -89,13 +89,6 @@ script:
   - make
 ########################################
 
-# Build kernel module ##################
-  - cd ${ROOT_DIR}/kmod
-  - export KDIR="${ROOT_DIR}/${KERNEL_DST}"
-  - ${ARM_MAKE} -C $KDIR M=$PWD clean
-  - ${ARM_MAKE} -C $KDIR M=$PWD
-########################################
-
 # Build devicetree overlay #############
   - cd ${ROOT_DIR}/dts
   - make clean
