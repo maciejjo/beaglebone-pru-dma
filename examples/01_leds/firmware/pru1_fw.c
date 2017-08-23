@@ -24,11 +24,15 @@ void main(void)
 				PRU_DMA_DIR_ARM_TO_PRU,
 				&resourceTable.rpmsg_vdev,
 				&resourceTable.rpmsg_vring0,
-				&resourceTable.rpmsg_vring1
+				&resourceTable.rpmsg_vring1,
+				&resourceTable.pru_dmas,
+				0
 				);
 
 		/* Poitner to destination buffer for pattern testing */
 		dst = (uint32_t *) dma_data.dst;
+
+		pru_dma_wait_host();
 
 		pru_dma_trigger();
 

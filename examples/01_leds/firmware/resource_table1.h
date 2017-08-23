@@ -63,10 +63,15 @@ struct ch_map pru_intc_map[] = {
 	{19, 1}, // Mam sysevt 19 (PRU1 kick) to channel 1 (ARM->PRU)
 };
 
+struct dma_ch pru_dma_ch[] = {
+	/* buffer address (filled by host), EDMA channel, EDMA PaRAM slot, buffer size, completion */
+	{0, 12, 200, 100, 0},
+};
+
 struct my_resource_table {
 	struct resource_table base;
 
-	uint32_t offset[2];
+	uint32_t offset[3];
 
 	/* rpmsg vdev entry */
 	struct fw_rsc_vdev rpmsg_vdev;
@@ -75,18 +80,20 @@ struct my_resource_table {
 
 	/* intc definition */
 	struct fw_rsc_custom pru_ints;
+	struct fw_rsc_custom pru_dmas;
 };
 
 #pragma DATA_SECTION(resourceTable, ".resource_table")
 #pragma RETAIN(resourceTable)
 struct my_resource_table resourceTable = {
 	1,	/* Resource table version: only version 1 is supported by the current driver */
-	2,	/* number of entries in the table */
+	3,	/* number of entries in the table */
 	0, 0,	/* reserved, must be zero */
 	/* offsets to entries */
 	{
 		offsetof(struct my_resource_table, rpmsg_vdev),
 		offsetof(struct my_resource_table, pru_ints),
+		offsetof(struct my_resource_table, pru_dmas),
 	},
 
 	/* rpmsg vdev entry */
@@ -135,6 +142,17 @@ struct my_resource_table resourceTable = {
 			(sizeof(pru_intc_map) / sizeof(struct ch_map)),
 			/* Pointer to the structure containing mapped events */
 			pru_intc_map,
+		},
+	},
+	/* PRU DMA entry */
+	{
+		TYPE_CUSTOM, TYPE_PRU_DMA,
+		sizeof(struct fw_rsc_custom_dma_ch),
+		.rsc.pru_dma = {
+			// Version number
+			0x0000,
+			1,
+			pru_dma_ch,
 		},
 	},
 };
