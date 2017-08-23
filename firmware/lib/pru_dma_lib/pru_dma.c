@@ -37,7 +37,9 @@ void pru_dma_init(struct pru_dma_data *dma_data,
 			enum pru_dma_direction dir,
 			struct fw_rsc_vdev *rpmsg_vdev,
 			struct fw_rsc_vdev_vring *rpmsg_vring0,
-			struct fw_rsc_vdev_vring *rpmsg_vring1)
+			struct fw_rsc_vdev_vring *rpmsg_vring1,
+			struct fw_rsc_custom_dma_ch *pru_dmas,
+			int chan_num)
 {
 
 	if (!rpmsg_init_done) {
@@ -58,6 +60,31 @@ void pru_dma_init(struct pru_dma_data *dma_data,
 		rpmsg_init_done = 1;
 	}
 
+	
+	if (dir == PRU_DMA_DIR_ARM_TO_PRU) {
+		edma_buf.src = pru_dmas->dma_ch[chan_num].buf_addr;
+		edma_buf.dst = PRU_SHMEM_OFFSET;
+	} else {
+		edma_buf.src = PRU_SHMEM_OFFSET;
+		edma_buf.dst = pru_dmas->dma_ch[chan_num].buf_addr;
+	}
+
+	edma_buf.chan = pru_dmas->dma_ch[chan_num].edma_channel;
+	edma_buf.slot = pru_dmas->dma_ch[chan_num].param_slot;
+	edma_buf.size = pru_dmas->dma_ch[chan_num].buf_addr;
+
+	edma_ptr = EDMA0_CC_BASE;
+
+	// Set up EDMA for transfer 
+	edma_setup(edma_ptr, &edma_buf);
+
+	dma_data->src = edma_buf.src;
+	dma_data->dst = edma_buf.dst;
+	dma_data->size = edma_buf.size;
+}
+
+void pru_dma_wait_host()
+{
 	while (1) {
 
 		if (__R31 & HOST1_INT) {
@@ -68,28 +95,6 @@ void pru_dma_init(struct pru_dma_data *dma_data,
 						&rpmsg_dst, &tx_desc,
 						&rpmsg_len) ==
 					PRU_RPMSG_SUCCESS) {
-
-				if (dir == PRU_DMA_DIR_ARM_TO_PRU) {
-					edma_buf.src = tx_desc.kbuf_addr;
-					edma_buf.dst = PRU_SHMEM_OFFSET;
-				} else {
-					edma_buf.src = PRU_SHMEM_OFFSET;
-					edma_buf.dst = tx_desc.kbuf_addr;
-				}
-
-				edma_buf.chan = tx_desc.edma_chan;
-				edma_buf.slot = tx_desc.edma_slot;
-				edma_buf.size = tx_desc.kbuf_size;
-
-				edma_ptr = EDMA0_CC_BASE;
-
-				/* Set up EDMA for transfer */
-				edma_setup(edma_ptr, &edma_buf);
-
-				dma_data->src = edma_buf.src;
-				dma_data->dst = edma_buf.dst;
-				dma_data->size = edma_buf.size;
-
 				break;
 			}
 		}
