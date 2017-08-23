@@ -1,0 +1,57 @@
+From eeadb92e4a278fa0903d97745a1553f2709a3eb5 Mon Sep 17 00:00:00 2001
+From: Maciej Sobkowski <maciej@sobkow.ski>
+Date: Wed, 23 Aug 2017 17:10:14 +0200
+Subject: [PATCH] Add PRU DMA custom resource to resource table
+
+---
+ include/pru_types.h | 16 ++++++++++++++++
+ include/rsc_types.h |  1 +
+ 2 files changed, 17 insertions(+)
+
+diff --git a/include/pru_types.h b/include/pru_types.h
+index c8ab8b1..79511cb 100644
+--- a/include/pru_types.h
++++ b/include/pru_types.h
+@@ -36,6 +36,7 @@
+ 
+ /* Custom Resource info: Must match drivers/remoteproc/pru_rproc.h */
+ #define TYPE_PRU_INTS		1
++#define TYPE_PRU_DMA		2
+ 
+ /**
+  * struct ch_map - sysevts-to-channel mapping
+@@ -80,4 +81,19 @@ struct fw_rsc_custom_ints {
+ 	struct ch_map *event_channel;
+ };
+ 
++struct dma_ch {
++       //buffer address (filled by host), EDMA channel, EDMA PaRAM slot, buffer size, completion
++       uint32_t buf_addr;
++       uint32_t buf_size;
++       uint8_t edma_channel;
++       uint8_t param_slot;
++       uint8_t notify_completion;
++};
++
++struct fw_rsc_custom_dma_ch {
++       uint16_t version;
++       uint32_t dma_ch_size;
++       struct dma_ch *dma_ch;
++};
++
+ #endif /* _PRU_TYPES_H_ */
+diff --git a/include/rsc_types.h b/include/rsc_types.h
+index 755ab60..a6fd65b 100644
+--- a/include/rsc_types.h
++++ b/include/rsc_types.h
+@@ -51,6 +51,7 @@
+ union fw_custom {
+ 	/* add custom resources here */
+ 	struct fw_rsc_custom_ints pru_ints;
++	struct fw_rsc_custom_dma_ch pru_dma;
+ 	/* maintain reserved as the last element */
+ 	uint32_t reserved;
+ };
+-- 
+2.14.1
+
