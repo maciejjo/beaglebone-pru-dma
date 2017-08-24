@@ -52,6 +52,8 @@ before_script:
 # Extract PRU SW package ###############
   - mkdir -p ${ROOT_DIR}/${TI_PRU_SWPKG_DST}
   - tar xf ${ROOT_DIR}/${DL_DIR}/pru-swpkg.tar.gz -C ${ROOT_DIR}/${TI_PRU_SWPKG_DST} --strip-components 1
+  - cd ${ROOT_DIR}/${TI_PRU_SWPKG_DST}
+  - git am ${ROOT_DIR}/pru-swpkg-patch/0001-Add-PRU-DMA-custom-resource-to-resource-table.patch
 ########################################
 
 # Install ARM crosstools ###############
