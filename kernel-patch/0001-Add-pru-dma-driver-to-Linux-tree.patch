@@ -1,4 +1,4 @@
-From 040768369c93d22cada841692b4a96e3ec5d981b Mon Sep 17 00:00:00 2001
+From 59096a51bc2f05452c1f7c443c257d35f109f41c Mon Sep 17 00:00:00 2001
 From: Maciej Sobkowski <maciej@sobkow.ski>
 Date: Wed, 16 Aug 2017 16:49:43 +0200
 Subject: [PATCH 1/3] Add pru-dma driver to Linux tree
@@ -10,14 +10,14 @@ configuration from firmware resource table.
 Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
 ---
  drivers/remoteproc/Makefile  |   2 +-
- drivers/remoteproc/pru_dma.c | 294 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/remoteproc/pru_dma.c | 287 +++++++++++++++++++++++++++++++++++++++++++
  include/linux/pru_dma.h      |  20 +++
- 3 files changed, 315 insertions(+), 1 deletion(-)
+ 3 files changed, 308 insertions(+), 1 deletion(-)
  create mode 100644 drivers/remoteproc/pru_dma.c
  create mode 100644 include/linux/pru_dma.h
 
 diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-index 8488f70..bfa227d 100644
+index 8488f70ed605..bfa227dcbc5c 100644
 --- a/drivers/remoteproc/Makefile
 +++ b/drivers/remoteproc/Makefile
 @@ -11,7 +11,7 @@ remoteproc-y				+= remoteproc_elf_loader.o
@@ -31,10 +31,10 @@ index 8488f70..bfa227d 100644
  obj-$(CONFIG_QCOM_MDT_LOADER)		+= qcom_mdt_loader.o
 diff --git a/drivers/remoteproc/pru_dma.c b/drivers/remoteproc/pru_dma.c
 new file mode 100644
-index 0000000..7e64895
+index 000000000000..e40a8ddd5a1c
 --- /dev/null
 +++ b/drivers/remoteproc/pru_dma.c
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,287 @@
 +#include <linux/module.h>
 +#include <linux/init.h>
 +#include <linux/pruss.h>
@@ -44,6 +44,9 @@ index 0000000..7e64895
 +#include <linux/of.h>
 +#include <linux/completion.h>
 +#include <linux/pru_dma.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/irqreturn.h>
 +
 +#define DRV_NAME "pru_dma"
 +
@@ -62,9 +65,13 @@ index 0000000..7e64895
 +struct pru_dma {
 +	struct list_head node;
 +	struct device *dev;
-+	struct rpmsg_device *rpdev;
++	//struct rpmsg_device *rpdev;
 +	struct pru_dma_buf buffers[PRU_DMA_MAX_CHANS];
 +	char *chan_name;
++	int irq_from_pru;
++	int irq_to_pru;
++	struct pruss *pruss;
++	struct pruss_mem_region pru1_memory;
 +};
 +
 +struct edma_tx_desc {
@@ -84,7 +91,7 @@ index 0000000..7e64895
 +
 +uint32_t *pru_dma_get_buffer(struct pru_dma *pru_dma, int buf_num)
 +{
-+	return pru_dma->buffers[buf_num].kbuf;
++	return pru_dma->buffers[buf_num].configured ?  pru_dma->buffers[buf_num].kbuf : ERR_PTR(-EPROBE_DEFER);
 +}
 +EXPORT_SYMBOL_GPL(pru_dma_get_buffer);
 +
@@ -97,6 +104,7 @@ index 0000000..7e64895
 +int pru_dma_map_buffer(struct pru_dma *pru_dma, int buf_num)
 +{
 +	int ret;
++
 +	pru_dma->buffers[buf_num].kbuf_dma =
 +		dma_map_single(pru_dma->dev, pru_dma->buffers[buf_num].kbuf,
 +		pru_dma->buffers[buf_num].kbuf_size, DMA_BIDIRECTIONAL);
@@ -147,23 +155,7 @@ index 0000000..7e64895
 +
 +int pru_dma_tx_trigger(struct pru_dma *pru_dma, int buf_num)
 +{
-+	int ret;
-+	struct edma_tx_desc tx_data;
-+
-+	/*
-+	tx_data.kbuf_addr = pru_dma->kbuf_dma;
-+	tx_data.kbuf_size = pru_dma->kbuf_size;
-+	tx_data.edma_slot = pru_dma->edma_slot;
-+	tx_data.edma_chan = pru_dma->edma_channel;
-+	tx_data.flags     = pru_dma->notify ? (TX_DESC_FLAGS_NOTIFY_COMPLETION) : (0x00);
-+	*/
-+
-+	dev_dbg(pru_dma->dev, "Sending msg of size %d\n", sizeof(tx_data));
-+	ret = rpmsg_send(pru_dma->rpdev->ept, &tx_data, sizeof(tx_data));
-+	if (ret) {
-+		pr_err("rpmsg_send failed: %d\n", ret);
-+		return ret;
-+	}
++	pruss_intc_trigger(pru_dma->irq_to_pru);
 +
 +	if (pru_dma->buffers[buf_num].notify)
 +		init_completion(&pru_dma->buffers[buf_num].tx_complete);
@@ -190,6 +182,9 @@ index 0000000..7e64895
 +
 +	mutex_lock(&pru_dma_list_mutex);
 +	list_for_each_entry(p, &pru_dma_list, node) {
++		pru_dma = p;
++		get_device(pru_dma->dev);
++		break;
 +		if (strcmp(chan_name, p->chan_name) == 0) {
 +			pru_dma = p;
 +			get_device(pru_dma->dev);
@@ -212,86 +207,68 @@ index 0000000..7e64895
 +}
 +EXPORT_SYMBOL_GPL(pru_dma_put);
 +
-+static int pru_dma_rx_cb(struct rpmsg_device *rpdev, void *data, int len,
-+						void *priv, u32 src)
++int i = 0;
++
++irqreturn_t pru_dma_irq_handler(int irq, void *data)
 +{
-+	struct pru_dma *pru_dma = dev_get_drvdata(&rpdev->dev);
++	struct pru_dma *pru_dma = data;
++	int i = 0;
 +
-+	print_hex_dump(KERN_INFO, "incoming message:", DUMP_PREFIX_NONE,
-+						16, 1, data, len, true);
++	uint32_t *ptr = (uint32_t *) pru_dma->pru1_memory.va;
++	dev_dbg(pru_dma->dev, "Interrupt from PRU received, reading mem: 0: 0x%.8x 1: 0x%.8x\n",
++			ptr[0], ptr[1]);
 +
-+	/*
-+	if (pru_dma->notify && len == 1 &&
-+			*(uint8_t *)data == PRU_DMA_TX_COMPLETED) {
-+		complete(&pru_dma->tx_complete);
++	for (i = 0; i < PRU_DMA_MAX_CHANS; i++) {
++		if (((1 << i) & ptr[0]) && pru_dma->buffers[i].notify) {
++			dev_dbg(pru_dma->dev, "Issue completion for channel %d\n", i);
++			complete(&pru_dma->buffers[i].tx_complete);
++		}
 +	}
-+	*/
 +
-+	return 0;
++	return IRQ_HANDLED;
 +}
 +
-+static int pru_dma_probe(struct rpmsg_device *rpdev)
++
++static int pru_dma_probe(struct platform_device *pdev)
 +{
 +	struct pru_dma *pru_dma;
-+	struct device_node *np = of_find_node_by_name(NULL, "pru_dma");
 +	int ret;
 +
-+	if (!np) {
-+		dev_err(&rpdev->dev, "must be instantiated via devicetree\n");
-+		return -ENOENT;
-+	}
-+
-+	pru_dma = devm_kzalloc(&rpdev->dev, sizeof(*pru_dma), GFP_KERNEL);
++	pru_dma = devm_kzalloc(&pdev->dev, sizeof(*pru_dma), GFP_KERNEL);
 +	if (!pru_dma)
 +		return -ENOMEM;
 +
-+	pru_dma->dev = &rpdev->dev;
-+	pru_dma->rpdev = rpdev;
++	pru_dma->dev = &pdev->dev;
 +
-+	dev_set_drvdata(&rpdev->dev, pru_dma);
++	dev_set_drvdata(&pdev->dev, pru_dma);
 +
-+	/*
-+	ret = of_property_read_u32(np, "edma-channel", &pru_dma->edma_channel);
-+	if (ret) {
-+		dev_err(pru_dma->dev, "invalid edma-channel in %s\n",
-+				np->full_name);
-+		return -EINVAL;
++	/* Grab PRU handle */
++
++	pru_dma->pruss = pruss_get(pru_dma->dev, NULL);
++	if (IS_ERR(pru_dma->pruss)) {
++		ret = PTR_ERR(pru_dma->pruss);
++		dev_err(pru_dma->dev, "Cannot get PRUSS handle");
++		goto err_pruss_get;
 +	}
 +
-+	ret = of_property_read_u32(np, "edma-slot", &pru_dma->edma_slot);
++	/* Map pru1 memory */
++	ret = pruss_request_mem_region(pru_dma->pruss, PRUSS_MEM_DRAM1,
++		&pru_dma->pru1_memory);
 +	if (ret) {
-+		dev_err(pru_dma->dev, "invalid edma-slot in %s\n",
-+				np->full_name);
-+		return -EINVAL;
++		dev_err(pru_dma->dev, "Unable to get PRUSS RAM.\n");
++		goto err_pruss_mem;
 +	}
 +
-+	ret = of_property_read_u32(np, "buffer-size", &pru_dma->kbuf_size);
-+	if (ret) {
-+		dev_err(pru_dma->dev, "invalid buffer-size in %s\n",
-+				np->full_name);
-+		return -EINVAL;
-+	}
++	pru_dma->irq_from_pru = platform_get_irq_byname(pdev, "irq_from_pru");
++	if (pru_dma->irq_from_pru < 0)
++		return pru_dma->irq_from_pru;
 +
-+	ret = of_property_read_string(np, "chan-name", &pru_dma->chan_name);
-+	if (ret) {
-+		dev_err(pru_dma->dev, "invalid chan-name in %s\n",
-+				np->full_name);
-+		return -EINVAL;
-+	}
++	pru_dma->irq_to_pru = platform_get_irq_byname(pdev, "irq_to_pru");
++	if (pru_dma->irq_to_pru < 0)
++		return pru_dma->irq_to_pru;
 +
-+	ret = of_property_read_u32(np, "notify-completion", &pru_dma->notify);
-+	if (ret) {
-+		dev_err(pru_dma->dev, "invalid notify-completion in %s\n",
-+				np->full_name);
-+		return -EINVAL;
-+	}
-+
-+	pru_dma->kbuf = devm_kzalloc(pru_dma->dev,
-+				pru_dma->kbuf_size * sizeof(uint32_t),
-+				GFP_KERNEL);
-+	if (!pru_dma->kbuf)
-+		return -ENOMEM;
-+	*/
++	ret = devm_request_irq(&pdev->dev, pru_dma->irq_from_pru, pru_dma_irq_handler,
++			IRQF_ONESHOT, dev_name(&pdev->dev), pru_dma);
 +
 +	dev_dbg(pru_dma->dev, "Probe success");
 +
@@ -300,38 +277,54 @@ index 0000000..7e64895
 +	mutex_unlock(&pru_dma_list_mutex);
 +
 +	return 0;
++
++err_pruss_mem:
++	if (pru_dma->pru1_memory.va)
++		pruss_release_mem_region(pru_dma->pruss, &pru_dma->pru1_memory);
++err_pruss_get:
++	return ret;
++
 +}
 +
-+static void pru_dma_remove(struct rpmsg_device *rpdev)
++int pru_dma_remove(struct platform_device *pdev)
 +{
-+	struct pru_dma *pru_dma = dev_get_drvdata(&rpdev->dev);
++	struct pru_dma *pru_dma = dev_get_drvdata(&pdev->dev);
 +
 +	mutex_lock(&pru_dma_list_mutex);
 +	list_del(&pru_dma->node);
 +	mutex_unlock(&pru_dma_list_mutex);
++
++	if (pru_dma->pru1_memory.va)
++		pruss_release_mem_region(pru_dma->pruss, &pru_dma->pru1_memory);
++
++	return 0;
 +}
 +
-+static struct rpmsg_device_id pru_dma_id_table[] = {
-+	{ .name	= "pru-dma" },
-+	{ },
++static const struct of_device_id pru_dma_ids[] = {
++	{ .compatible = "pru-dma", },
++	{},
 +};
-+MODULE_DEVICE_TABLE(rpmsg, pru_dma_id_table);
++MODULE_DEVICE_TABLE(of, pru_dma_ids);
 +
-+static struct rpmsg_driver pru_dma_driver = {
-+	.drv.name	= KBUILD_MODNAME,
-+	.id_table	= pru_dma_id_table,
-+	.probe		= pru_dma_probe,
-+	.callback	= pru_dma_rx_cb,
-+	.remove		= pru_dma_remove,
++static struct platform_driver pru_dma_driver = {
++	.driver = {
++		.name = DRV_NAME,
++		.owner = THIS_MODULE,
++		.of_match_table = pru_dma_ids,
++	},
++	.probe = pru_dma_probe,
++	.remove = pru_dma_remove,
 +};
-+module_rpmsg_driver(pru_dma_driver);
++
++module_platform_driver(pru_dma_driver);
++
 +
 +MODULE_DESCRIPTION("PRU DMA driver");
 +MODULE_AUTHOR("Maciej Sobkowski");
 +MODULE_LICENSE("GPL");
 diff --git a/include/linux/pru_dma.h b/include/linux/pru_dma.h
 new file mode 100644
-index 0000000..040337b
+index 000000000000..040337b2c346
 --- /dev/null
 +++ b/include/linux/pru_dma.h
 @@ -0,0 +1,20 @@
@@ -356,5 +349,5 @@ index 0000000..040337b
 +
 +#endif /* __LINUX_PRU_DMA_H */
 -- 
-2.14.0
+2.14.1
 

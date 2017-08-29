@@ -1,4 +1,4 @@
-From f308f44da33824ba6e1f0dd49fb5799b6f708f88 Mon Sep 17 00:00:00 2001
+From 8fc33f4ab574bd28404b9f0ef146d2aee1b96716 Mon Sep 17 00:00:00 2001
 From: Maciej Sobkowski <maciej@sobkow.ski>
 Date: Wed, 16 Aug 2017 17:01:45 +0200
 Subject: [PATCH 3/3] Add parsing of PRU_DMA resource type to pru_rproc
@@ -9,12 +9,12 @@ represent this resource type in the table.
 
 Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
 ---
- drivers/remoteproc/pru_rproc.c | 57 ++++++++++++++++++++++++++++++++++++++++++
- drivers/remoteproc/pru_rproc.h |  3 ++-
- 2 files changed, 59 insertions(+), 1 deletion(-)
+ drivers/remoteproc/pru_rproc.c | 67 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/remoteproc/pru_rproc.h |  3 +-
+ 2 files changed, 69 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/remoteproc/pru_rproc.c b/drivers/remoteproc/pru_rproc.c
-index e8c1a80..404d6fe 100644
+index e8c1a800cc06..aae7387ff8ff 100644
 --- a/drivers/remoteproc/pru_rproc.c
 +++ b/drivers/remoteproc/pru_rproc.c
 @@ -23,6 +23,7 @@
@@ -25,13 +25,12 @@ index e8c1a80..404d6fe 100644
  
  #include "remoteproc_internal.h"
  #include "pruss.h"
-@@ -621,6 +622,58 @@ static int pru_handle_custom_intrmap(struct rproc *rproc,
+@@ -621,6 +622,67 @@ static int pru_handle_custom_intrmap(struct rproc *rproc,
  	return ret;
  }
  
 +/*
-+ * parse the custom interrupt map resource and configure the INTC
-+ * appropriately
++ * parse the custom DMA channel
 + */
 +static int pru_handle_custom_dma_channels(struct rproc *rproc,
 +				     struct fw_rsc_custom_dma_ch *dma_rsc)
@@ -41,25 +40,33 @@ index e8c1a80..404d6fe 100644
 +	uint32_t buf_addr;
 +	uint32_t buf_size;
 +	uint8_t notify_completion;
-+	struct dma_ch *dma_ch = dma_rsc->dma_ch;
 +	struct pru_dma *pru_dma;
 +	int ret;
 +
 +	if (dma_rsc->version != 0) {
-+		dev_err(dev, "only custom ints resource version 0 supported\n");
++		dev_err(dev, "Only custom dma resource version 0 supported\n");
 +		return -EINVAL;
 +	}
 +
 +	if (dma_rsc->dma_ch_size < 0 ||
 +	    dma_rsc->dma_ch_size >= MAX_PRU_DMA_CHANS) {
-+		dev_err(dev, "custom ints resource has more DMA channels then allowed\n");
++		dev_err(dev, "custom dma resource has more DMA channels then allowed (%u)\n", dma_rsc->dma_ch_size);
 +		return -EINVAL;
 +	}
++
 +	/* parse and fill in system event to interrupt channel mapping */
 +	for (i = 0; i < dma_rsc->dma_ch_size; i++) {
-+		buf_addr = dma_ch[i].buf_addr;
-+		buf_size = dma_ch[i].buf_size;
-+		notify_completion = dma_ch[i].notify_completion;
++
++		dev_dbg(dev, "handling dma_ch %d  buf_addr = %d buf_size = %d edma_channel = %d param_slot = %d\n",
++				i,
++				dma_rsc->dma_ch[i].buf_addr,
++				dma_rsc->dma_ch[i].buf_size,
++				dma_rsc->dma_ch[i].edma_channel,
++				dma_rsc->dma_ch[i].param_slot
++				);
++
++		buf_size = dma_rsc->dma_ch[i].buf_size;
++		notify_completion = dma_rsc->dma_ch[i].notify_completion;
 +
 +		pru_dma = pru_dma_get("pru-dma");
 +
@@ -75,6 +82,8 @@ index e8c1a80..404d6fe 100644
 +			return ret;
 +		}
 +
++		dma_rsc->dma_ch[i].buf_addr = buf_addr;
++
 +		pru_dma_put(pru_dma);
 +	}
 +
@@ -84,19 +93,20 @@ index e8c1a80..404d6fe 100644
  /* PRU-specific post loading custom resource handler */
  static int pru_rproc_handle_custom_rsc(struct rproc *rproc,
  				       struct fw_rsc_custom *rsc)
-@@ -633,6 +686,10 @@ static int pru_rproc_handle_custom_rsc(struct rproc *rproc,
- 		ret = pru_handle_custom_intrmap(rproc,
+@@ -634,6 +696,11 @@ static int pru_rproc_handle_custom_rsc(struct rproc *rproc,
  						(struct fw_rsc_custom_intrmap *)
  						rsc->data);
+ 		break;
 +	case PRUSS_RSC_DMA:
 +		ret = pru_handle_custom_dma_channels(rproc,
 +						(struct fw_rsc_custom_dma_ch *)
 +						rsc->data);
- 		break;
++		break;
  	default:
  		dev_err(dev, "%s: handling unknown type %d\n", __func__,
+ 			rsc->sub_type);
 diff --git a/drivers/remoteproc/pru_rproc.h b/drivers/remoteproc/pru_rproc.h
-index 98e1c5b..a1c877d 100644
+index 614424576323..b24e8cbb386e 100644
 --- a/drivers/remoteproc/pru_rproc.h
 +++ b/drivers/remoteproc/pru_rproc.h
 @@ -45,7 +45,8 @@
@@ -110,5 +120,5 @@ index 98e1c5b..a1c877d 100644
  
  /**
 -- 
-2.14.0
+2.14.1
 

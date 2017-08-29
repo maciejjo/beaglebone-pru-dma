@@ -1,4 +1,4 @@
-From f1f0948493409c21b246728bbcfb96aac3bedc7d Mon Sep 17 00:00:00 2001
+From a9f0668e478347eafa537fc3d4bbc216ed8438cf Mon Sep 17 00:00:00 2001
 From: Maciej Sobkowski <maciej@sobkow.ski>
 Date: Wed, 16 Aug 2017 17:01:19 +0200
 Subject: [PATCH 2/3] Add new resource structures for pru dma
@@ -13,7 +13,7 @@ Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
  2 files changed, 17 insertions(+)
 
 diff --git a/drivers/remoteproc/pru_rproc.h b/drivers/remoteproc/pru_rproc.h
-index 23c4c02..98e1c5b 100644
+index 23c4c025819b..614424576323 100644
 --- a/drivers/remoteproc/pru_rproc.h
 +++ b/drivers/remoteproc/pru_rproc.h
 @@ -90,4 +90,19 @@ struct fw_rsc_custom_intrmap {
@@ -24,20 +24,20 @@ index 23c4c02..98e1c5b 100644
 +	//buffer address (filled by host), EDMA channel, EDMA PaRAM slot, buffer size, completion
 +	u32 buf_addr;
 +	u32 buf_size;
-+	u8 edma_channel;
-+	u8 param_slot;
-+	u8 notify_completion;
-+};
++	u32 edma_channel;
++	u32 param_slot;
++	u32 notify_completion;
++} __packed;
 +
 +struct fw_rsc_custom_dma_ch {
-+	u16 version;
++	u32 version;
 +	u32 dma_ch_size;
-+	struct dma_ch *dma_ch;
-+};
++	struct dma_ch dma_ch[0];
++} __packed;
 +
  #endif	/* _PRU_REMOTEPROC_H_ */
 diff --git a/drivers/remoteproc/pruss.h b/drivers/remoteproc/pruss.h
-index ae23778..cabe82b 100644
+index ae23778014d5..cabe82b84873 100644
 --- a/drivers/remoteproc/pruss.h
 +++ b/drivers/remoteproc/pruss.h
 @@ -34,6 +34,8 @@
@@ -50,5 +50,5 @@ index ae23778..cabe82b 100644
  #define PRU_INTC_REVID		0x0000
  #define PRU_INTC_CR		0x0004
 -- 
-2.14.0
+2.14.1
 

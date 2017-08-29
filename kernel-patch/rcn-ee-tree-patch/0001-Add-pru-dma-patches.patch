@@ -1,0 +1,590 @@
+From 143dd4755dbeaf3b2ffffc822732f17cb2a76d3c Mon Sep 17 00:00:00 2001
+From: Maciej Sobkowski <maciej@sobkow.ski>
+Date: Wed, 23 Aug 2017 11:27:24 +0200
+Subject: [PATCH] Add pru-dma patches
+
+---
+ patch.sh                                           |   5 +
+ .../0001-Add-pru-dma-driver-to-Linux-tree.patch    | 353 +++++++++++++++++++++
+ ...2-Add-new-resource-structures-for-pru-dma.patch |  54 ++++
+ ...ing-of-PRU_DMA-resource-type-to-pru_rproc.patch | 124 ++++++++
+ 4 files changed, 536 insertions(+)
+ create mode 100644 patches/pru_dma/0001-Add-pru-dma-driver-to-Linux-tree.patch
+ create mode 100644 patches/pru_dma/0002-Add-new-resource-structures-for-pru-dma.patch
+ create mode 100644 patches/pru_dma/0003-Add-parsing-of-PRU_DMA-resource-type-to-pru_rproc.patch
+
+diff --git a/patch.sh b/patch.sh
+index b3d6af4a..86012300 100644
+--- a/patch.sh
++++ b/patch.sh
+@@ -461,6 +461,10 @@ drivers () {
+ 	dir 'drivers/ti/beaglelogic'
+ }
+ 
++pru_dma () {
++	dir 'pru_dma'
++}
++
+ soc () {
+ #	dir 'soc/exynos'
+ #	dir 'soc/imx/udoo'
+@@ -566,6 +570,7 @@ soc
+ beaglebone
+ dir 'build/gcc'
+ dir 'x15_revc'
++dir 'pru_dma'
+ 
+ sync_mainline_dtc () {
+ 	echo "dir: dtc"
+diff --git a/patches/pru_dma/0001-Add-pru-dma-driver-to-Linux-tree.patch b/patches/pru_dma/0001-Add-pru-dma-driver-to-Linux-tree.patch
+new file mode 100644
+index 00000000..c9b1423f
+--- /dev/null
++++ b/patches/pru_dma/0001-Add-pru-dma-driver-to-Linux-tree.patch
+@@ -0,0 +1,353 @@
++From 59096a51bc2f05452c1f7c443c257d35f109f41c Mon Sep 17 00:00:00 2001
++From: Maciej Sobkowski <maciej@sobkow.ski>
++Date: Wed, 16 Aug 2017 16:49:43 +0200
++Subject: [PATCH 1/3] Add pru-dma driver to Linux tree
++
++To use pru-dma from pru_rproc module, it needs to be present in tree
++during compilation. It is also modified to support DMA channels
++configuration from firmware resource table.
++
++Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
++---
++ drivers/remoteproc/Makefile  |   2 +-
++ drivers/remoteproc/pru_dma.c | 287 +++++++++++++++++++++++++++++++++++++++++++
++ include/linux/pru_dma.h      |  20 +++
++ 3 files changed, 308 insertions(+), 1 deletion(-)
++ create mode 100644 drivers/remoteproc/pru_dma.c
++ create mode 100644 include/linux/pru_dma.h
++
++diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
++index 8488f70ed605..bfa227dcbc5c 100644
++--- a/drivers/remoteproc/Makefile
+++++ b/drivers/remoteproc/Makefile
++@@ -11,7 +11,7 @@ remoteproc-y				+= remoteproc_elf_loader.o
++ obj-$(CONFIG_OMAP_REMOTEPROC)		+= omap_remoteproc.o
++ obj-$(CONFIG_WKUP_M3_RPROC)		+= wkup_m3_rproc.o
++ obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
++-obj-$(CONFIG_PRUSS_REMOTEPROC)		+= pruss_soc_bus.o pruss.o pruss_intc.o pru_rproc.o
+++obj-$(CONFIG_PRUSS_REMOTEPROC)		+= pruss_soc_bus.o pruss.o pruss_intc.o pru_rproc.o pru_dma.o
++ obj-$(CONFIG_KEYSTONE_REMOTEPROC)	+= keystone_remoteproc.o
++ obj-$(CONFIG_QCOM_ADSP_PIL)		+= qcom_adsp_pil.o
++ obj-$(CONFIG_QCOM_MDT_LOADER)		+= qcom_mdt_loader.o
++diff --git a/drivers/remoteproc/pru_dma.c b/drivers/remoteproc/pru_dma.c
++new file mode 100644
++index 000000000000..e40a8ddd5a1c
++--- /dev/null
+++++ b/drivers/remoteproc/pru_dma.c
++@@ -0,0 +1,287 @@
+++#include <linux/module.h>
+++#include <linux/init.h>
+++#include <linux/pruss.h>
+++#include <linux/rpmsg.h>
+++#include <linux/pinctrl/consumer.h>
+++#include <linux/dma-mapping.h>
+++#include <linux/of.h>
+++#include <linux/completion.h>
+++#include <linux/pru_dma.h>
+++#include <linux/platform_device.h>
+++#include <linux/interrupt.h>
+++#include <linux/irqreturn.h>
+++
+++#define DRV_NAME "pru_dma"
+++
+++#define PRU_DMA_MAX_CHANS 10
+++
+++struct pru_dma_buf {
+++	uint32_t *kbuf;
+++	dma_addr_t kbuf_dma;
+++	uint32_t kbuf_size;
+++	uint32_t notify;
+++	struct completion tx_complete;
+++	uint8_t configured;
+++
+++};
+++
+++struct pru_dma {
+++	struct list_head node;
+++	struct device *dev;
+++	//struct rpmsg_device *rpdev;
+++	struct pru_dma_buf buffers[PRU_DMA_MAX_CHANS];
+++	char *chan_name;
+++	int irq_from_pru;
+++	int irq_to_pru;
+++	struct pruss *pruss;
+++	struct pruss_mem_region pru1_memory;
+++};
+++
+++struct edma_tx_desc {
+++	uint32_t kbuf_addr;
+++	uint32_t kbuf_size;
+++	uint8_t  edma_slot;
+++	uint8_t  edma_chan;
+++	uint8_t  flags;
+++};
+++
+++#define TX_DESC_FLAGS_NOTIFY_COMPLETION (1 << 0)
+++
+++#define PRU_DMA_TX_COMPLETED (uint8_t) (0x01)
+++
+++static DEFINE_MUTEX(pru_dma_list_mutex);
+++static LIST_HEAD(pru_dma_list);
+++
+++uint32_t *pru_dma_get_buffer(struct pru_dma *pru_dma, int buf_num)
+++{
+++	return pru_dma->buffers[buf_num].configured ?  pru_dma->buffers[buf_num].kbuf : ERR_PTR(-EPROBE_DEFER);
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_get_buffer);
+++
+++uint32_t pru_dma_get_buffer_size(struct pru_dma *pru_dma, int buf_num)
+++{
+++	return pru_dma->buffers[buf_num].kbuf_size;
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_get_buffer_size);
+++
+++int pru_dma_map_buffer(struct pru_dma *pru_dma, int buf_num)
+++{
+++	int ret;
+++
+++	pru_dma->buffers[buf_num].kbuf_dma =
+++		dma_map_single(pru_dma->dev, pru_dma->buffers[buf_num].kbuf,
+++		pru_dma->buffers[buf_num].kbuf_size, DMA_BIDIRECTIONAL);
+++	ret = dma_mapping_error(pru_dma->dev, pru_dma->buffers[buf_num].kbuf_dma);
+++	if (ret) {
+++		dev_err(pru_dma->dev, "Buffer DMA mapping failed");
+++		return ret;
+++	}
+++
+++	return 0;
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_map_buffer);
+++
+++void pru_dma_unmap_buffer(struct pru_dma *pru_dma, int buf_num)
+++{
+++	dma_unmap_single(pru_dma->dev, pru_dma->buffers[buf_num].kbuf_dma,
+++			pru_dma->buffers[buf_num].kbuf_size, DMA_BIDIRECTIONAL);
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_unmap_buffer);
+++
+++int pru_dma_buffer_setup(struct pru_dma *pru_dma, uint32_t *buf_addr, uint32_t buf_size, uint8_t notify_completion, int buf_num)
+++{
+++	int ret;
+++	pru_dma->buffers[buf_num].kbuf = devm_kzalloc(pru_dma->dev,
+++				buf_size * sizeof(uint32_t),
+++				GFP_KERNEL);
+++	if (!pru_dma->buffers[buf_num].kbuf)
+++		return -ENOMEM;
+++
+++	pru_dma->buffers[buf_num].kbuf_dma = dma_map_single(pru_dma->dev, pru_dma->buffers[buf_num].kbuf,
+++			buf_size, DMA_BIDIRECTIONAL);
+++	ret = dma_mapping_error(pru_dma->dev, pru_dma->buffers[buf_num].kbuf_dma);
+++	if (ret) {
+++		dev_err(pru_dma->dev, "Buffer DMA mapping failed");
+++		return ret;
+++	}
+++
+++	*buf_addr = pru_dma->buffers[buf_num].kbuf_dma;
+++
+++	pru_dma->buffers[buf_num].notify = notify_completion;
+++	pru_dma->buffers[buf_num].kbuf_size = buf_size;
+++	pru_dma->buffers[buf_num].configured = 1;
+++
+++	return 0;
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_buffer_setup);
+++
+++
+++int pru_dma_tx_trigger(struct pru_dma *pru_dma, int buf_num)
+++{
+++	pruss_intc_trigger(pru_dma->irq_to_pru);
+++
+++	if (pru_dma->buffers[buf_num].notify)
+++		init_completion(&pru_dma->buffers[buf_num].tx_complete);
+++
+++	return 0;
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_tx_trigger);
+++
+++int pru_dma_tx_completion_wait(struct pru_dma *pru_dma, int buf_num)
+++{
+++	if (pru_dma->buffers[buf_num].notify) {
+++		wait_for_completion(&pru_dma->buffers[buf_num].tx_complete);
+++		return 0;
+++	} else {
+++		pr_err("TX completion notification disabled\n");
+++		return -1;
+++	}
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_tx_completion_wait);
+++
+++struct pru_dma *pru_dma_get(char *chan_name)
+++{
+++	struct pru_dma *pru_dma = NULL, *p;
+++
+++	mutex_lock(&pru_dma_list_mutex);
+++	list_for_each_entry(p, &pru_dma_list, node) {
+++		pru_dma = p;
+++		get_device(pru_dma->dev);
+++		break;
+++		if (strcmp(chan_name, p->chan_name) == 0) {
+++			pru_dma = p;
+++			get_device(pru_dma->dev);
+++			break;
+++		}
+++	}
+++
+++	mutex_unlock(&pru_dma_list_mutex);
+++
+++	return pru_dma ? pru_dma : ERR_PTR(-EPROBE_DEFER);
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_get);
+++
+++void pru_dma_put(struct pru_dma *pru_dma)
+++{
+++	if (!pru_dma)
+++		return;
+++
+++	put_device(pru_dma->dev);
+++}
+++EXPORT_SYMBOL_GPL(pru_dma_put);
+++
+++int i = 0;
+++
+++irqreturn_t pru_dma_irq_handler(int irq, void *data)
+++{
+++	struct pru_dma *pru_dma = data;
+++	int i = 0;
+++
+++	uint32_t *ptr = (uint32_t *) pru_dma->pru1_memory.va;
+++	dev_dbg(pru_dma->dev, "Interrupt from PRU received, reading mem: 0: 0x%.8x 1: 0x%.8x\n",
+++			ptr[0], ptr[1]);
+++
+++	for (i = 0; i < PRU_DMA_MAX_CHANS; i++) {
+++		if (((1 << i) & ptr[0]) && pru_dma->buffers[i].notify) {
+++			dev_dbg(pru_dma->dev, "Issue completion for channel %d\n", i);
+++			complete(&pru_dma->buffers[i].tx_complete);
+++		}
+++	}
+++
+++	return IRQ_HANDLED;
+++}
+++
+++
+++static int pru_dma_probe(struct platform_device *pdev)
+++{
+++	struct pru_dma *pru_dma;
+++	int ret;
+++
+++	pru_dma = devm_kzalloc(&pdev->dev, sizeof(*pru_dma), GFP_KERNEL);
+++	if (!pru_dma)
+++		return -ENOMEM;
+++
+++	pru_dma->dev = &pdev->dev;
+++
+++	dev_set_drvdata(&pdev->dev, pru_dma);
+++
+++	/* Grab PRU handle */
+++
+++	pru_dma->pruss = pruss_get(pru_dma->dev, NULL);
+++	if (IS_ERR(pru_dma->pruss)) {
+++		ret = PTR_ERR(pru_dma->pruss);
+++		dev_err(pru_dma->dev, "Cannot get PRUSS handle");
+++		goto err_pruss_get;
+++	}
+++
+++	/* Map pru1 memory */
+++	ret = pruss_request_mem_region(pru_dma->pruss, PRUSS_MEM_DRAM1,
+++		&pru_dma->pru1_memory);
+++	if (ret) {
+++		dev_err(pru_dma->dev, "Unable to get PRUSS RAM.\n");
+++		goto err_pruss_mem;
+++	}
+++
+++	pru_dma->irq_from_pru = platform_get_irq_byname(pdev, "irq_from_pru");
+++	if (pru_dma->irq_from_pru < 0)
+++		return pru_dma->irq_from_pru;
+++
+++	pru_dma->irq_to_pru = platform_get_irq_byname(pdev, "irq_to_pru");
+++	if (pru_dma->irq_to_pru < 0)
+++		return pru_dma->irq_to_pru;
+++
+++	ret = devm_request_irq(&pdev->dev, pru_dma->irq_from_pru, pru_dma_irq_handler,
+++			IRQF_ONESHOT, dev_name(&pdev->dev), pru_dma);
+++
+++	dev_dbg(pru_dma->dev, "Probe success");
+++
+++	mutex_lock(&pru_dma_list_mutex);
+++	list_add_tail(&pru_dma->node, &pru_dma_list);
+++	mutex_unlock(&pru_dma_list_mutex);
+++
+++	return 0;
+++
+++err_pruss_mem:
+++	if (pru_dma->pru1_memory.va)
+++		pruss_release_mem_region(pru_dma->pruss, &pru_dma->pru1_memory);
+++err_pruss_get:
+++	return ret;
+++
+++}
+++
+++int pru_dma_remove(struct platform_device *pdev)
+++{
+++	struct pru_dma *pru_dma = dev_get_drvdata(&pdev->dev);
+++
+++	mutex_lock(&pru_dma_list_mutex);
+++	list_del(&pru_dma->node);
+++	mutex_unlock(&pru_dma_list_mutex);
+++
+++	if (pru_dma->pru1_memory.va)
+++		pruss_release_mem_region(pru_dma->pruss, &pru_dma->pru1_memory);
+++
+++	return 0;
+++}
+++
+++static const struct of_device_id pru_dma_ids[] = {
+++	{ .compatible = "pru-dma", },
+++	{},
+++};
+++MODULE_DEVICE_TABLE(of, pru_dma_ids);
+++
+++static struct platform_driver pru_dma_driver = {
+++	.driver = {
+++		.name = DRV_NAME,
+++		.owner = THIS_MODULE,
+++		.of_match_table = pru_dma_ids,
+++	},
+++	.probe = pru_dma_probe,
+++	.remove = pru_dma_remove,
+++};
+++
+++module_platform_driver(pru_dma_driver);
+++
+++
+++MODULE_DESCRIPTION("PRU DMA driver");
+++MODULE_AUTHOR("Maciej Sobkowski");
+++MODULE_LICENSE("GPL");
++diff --git a/include/linux/pru_dma.h b/include/linux/pru_dma.h
++new file mode 100644
++index 000000000000..040337b2c346
++--- /dev/null
+++++ b/include/linux/pru_dma.h
++@@ -0,0 +1,20 @@
+++#ifndef __LINUX_PRU_DMA_H
+++#define __LINUX_PRU_DMA_H
+++
+++struct pru_dma;
+++
+++struct pru_dma *pru_dma_get(char *chan_name);
+++void pru_dma_put(struct pru_dma *pru_dma);
+++
+++uint32_t *pru_dma_get_buffer(struct pru_dma *pru_dma, int buf_num);
+++uint32_t pru_dma_get_buffer_size(struct pru_dma *pru_dma, int buf_num);
+++
+++int pru_dma_map_buffer(struct pru_dma *pru_dma, int buf_num);
+++void pru_dma_unmap_buffer(struct pru_dma *pru_dma, int buf_num);
+++
+++int pru_dma_buffer_setup(struct pru_dma *pru_dma, uint32_t *buf_addr, uint32_t buf_size, uint8_t notify_completion, int buf_num);
+++
+++int pru_dma_tx_trigger(struct pru_dma *pru_dma, int buf_num);
+++int pru_dma_tx_completion_wait(struct pru_dma *pru_dma, int buf_num);
+++
+++#endif /* __LINUX_PRU_DMA_H */
++-- 
++2.14.1
++
+diff --git a/patches/pru_dma/0002-Add-new-resource-structures-for-pru-dma.patch b/patches/pru_dma/0002-Add-new-resource-structures-for-pru-dma.patch
+new file mode 100644
+index 00000000..2fd5f180
+--- /dev/null
++++ b/patches/pru_dma/0002-Add-new-resource-structures-for-pru-dma.patch
+@@ -0,0 +1,54 @@
++From a9f0668e478347eafa537fc3d4bbc216ed8438cf Mon Sep 17 00:00:00 2001
++From: Maciej Sobkowski <maciej@sobkow.ski>
++Date: Wed, 16 Aug 2017 17:01:19 +0200
++Subject: [PATCH 2/3] Add new resource structures for pru dma
++
++This structures describe custom resource from pru firmware resource
++table used to configure dma channels
++
++Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
++---
++ drivers/remoteproc/pru_rproc.h | 15 +++++++++++++++
++ drivers/remoteproc/pruss.h     |  2 ++
++ 2 files changed, 17 insertions(+)
++
++diff --git a/drivers/remoteproc/pru_rproc.h b/drivers/remoteproc/pru_rproc.h
++index 23c4c025819b..614424576323 100644
++--- a/drivers/remoteproc/pru_rproc.h
+++++ b/drivers/remoteproc/pru_rproc.h
++@@ -90,4 +90,19 @@ struct fw_rsc_custom_intrmap {
++ 	struct pruss_event_chnl *event_chnl_map;
++ };
++ 
+++struct dma_ch {
+++	//buffer address (filled by host), EDMA channel, EDMA PaRAM slot, buffer size, completion
+++	u32 buf_addr;
+++	u32 buf_size;
+++	u32 edma_channel;
+++	u32 param_slot;
+++	u32 notify_completion;
+++} __packed;
+++
+++struct fw_rsc_custom_dma_ch {
+++	u32 version;
+++	u32 dma_ch_size;
+++	struct dma_ch dma_ch[0];
+++} __packed;
+++
++ #endif	/* _PRU_REMOTEPROC_H_ */
++diff --git a/drivers/remoteproc/pruss.h b/drivers/remoteproc/pruss.h
++index ae23778014d5..cabe82b84873 100644
++--- a/drivers/remoteproc/pruss.h
+++++ b/drivers/remoteproc/pruss.h
++@@ -34,6 +34,8 @@
++ /* maximum number of host interrupts */
++ #define MAX_PRU_HOST_INT	10
++ 
+++#define MAX_PRU_DMA_CHANS	10
+++
++ /* PRU_ICSS_INTC registers */
++ #define PRU_INTC_REVID		0x0000
++ #define PRU_INTC_CR		0x0004
++-- 
++2.14.1
++
+diff --git a/patches/pru_dma/0003-Add-parsing-of-PRU_DMA-resource-type-to-pru_rproc.patch b/patches/pru_dma/0003-Add-parsing-of-PRU_DMA-resource-type-to-pru_rproc.patch
+new file mode 100644
+index 00000000..90036183
+--- /dev/null
++++ b/patches/pru_dma/0003-Add-parsing-of-PRU_DMA-resource-type-to-pru_rproc.patch
+@@ -0,0 +1,124 @@
++From 8fc33f4ab574bd28404b9f0ef146d2aee1b96716 Mon Sep 17 00:00:00 2001
++From: Maciej Sobkowski <maciej@sobkow.ski>
++Date: Wed, 16 Aug 2017 17:01:45 +0200
++Subject: [PATCH 3/3] Add parsing of PRU_DMA resource type to pru_rproc
++
++DMA buffers are set up based on resource table from firmware during PRU
++configuration, before boot. Add new custom resource type which will
++represent this resource type in the table.
++
++Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
++---
++ drivers/remoteproc/pru_rproc.c | 67 ++++++++++++++++++++++++++++++++++++++++++
++ drivers/remoteproc/pru_rproc.h |  3 +-
++ 2 files changed, 69 insertions(+), 1 deletion(-)
++
++diff --git a/drivers/remoteproc/pru_rproc.c b/drivers/remoteproc/pru_rproc.c
++index e8c1a800cc06..aae7387ff8ff 100644
++--- a/drivers/remoteproc/pru_rproc.c
+++++ b/drivers/remoteproc/pru_rproc.c
++@@ -23,6 +23,7 @@
++ #include <linux/of_device.h>
++ #include <linux/remoteproc.h>
++ #include <linux/pruss.h>
+++#include <linux/pru_dma.h>
++ 
++ #include "remoteproc_internal.h"
++ #include "pruss.h"
++@@ -621,6 +622,67 @@ static int pru_handle_custom_intrmap(struct rproc *rproc,
++ 	return ret;
++ }
++ 
+++/*
+++ * parse the custom DMA channel
+++ */
+++static int pru_handle_custom_dma_channels(struct rproc *rproc,
+++				     struct fw_rsc_custom_dma_ch *dma_rsc)
+++{
+++	struct device *dev = rproc->dev.parent;
+++	int i;
+++	uint32_t buf_addr;
+++	uint32_t buf_size;
+++	uint8_t notify_completion;
+++	struct pru_dma *pru_dma;
+++	int ret;
+++
+++	if (dma_rsc->version != 0) {
+++		dev_err(dev, "Only custom dma resource version 0 supported\n");
+++		return -EINVAL;
+++	}
+++
+++	if (dma_rsc->dma_ch_size < 0 ||
+++	    dma_rsc->dma_ch_size >= MAX_PRU_DMA_CHANS) {
+++		dev_err(dev, "custom dma resource has more DMA channels then allowed (%u)\n", dma_rsc->dma_ch_size);
+++		return -EINVAL;
+++	}
+++
+++	/* parse and fill in system event to interrupt channel mapping */
+++	for (i = 0; i < dma_rsc->dma_ch_size; i++) {
+++
+++		dev_dbg(dev, "handling dma_ch %d  buf_addr = %d buf_size = %d edma_channel = %d param_slot = %d\n",
+++				i,
+++				dma_rsc->dma_ch[i].buf_addr,
+++				dma_rsc->dma_ch[i].buf_size,
+++				dma_rsc->dma_ch[i].edma_channel,
+++				dma_rsc->dma_ch[i].param_slot
+++				);
+++
+++		buf_size = dma_rsc->dma_ch[i].buf_size;
+++		notify_completion = dma_rsc->dma_ch[i].notify_completion;
+++
+++		pru_dma = pru_dma_get("pru-dma");
+++
+++		if (IS_ERR(pru_dma)) {
+++			ret = PTR_ERR(pru_dma);
+++			if (ret != -EPROBE_DEFER)
+++				dev_err(dev, "Unable to get pru_dma handle.\n");
+++			return ret;
+++		}
+++
+++		if ((ret = pru_dma_buffer_setup(pru_dma, &buf_addr, buf_size, notify_completion, i))) {
+++			dev_err(dev, "Error while setting up DMA buffer %u\n", i);
+++			return ret;
+++		}
+++
+++		dma_rsc->dma_ch[i].buf_addr = buf_addr;
+++
+++		pru_dma_put(pru_dma);
+++	}
+++
+++	return 0;
+++}
+++
++ /* PRU-specific post loading custom resource handler */
++ static int pru_rproc_handle_custom_rsc(struct rproc *rproc,
++ 				       struct fw_rsc_custom *rsc)
++@@ -634,6 +696,11 @@ static int pru_rproc_handle_custom_rsc(struct rproc *rproc,
++ 						(struct fw_rsc_custom_intrmap *)
++ 						rsc->data);
++ 		break;
+++	case PRUSS_RSC_DMA:
+++		ret = pru_handle_custom_dma_channels(rproc,
+++						(struct fw_rsc_custom_dma_ch *)
+++						rsc->data);
+++		break;
++ 	default:
++ 		dev_err(dev, "%s: handling unknown type %d\n", __func__,
++ 			rsc->sub_type);
++diff --git a/drivers/remoteproc/pru_rproc.h b/drivers/remoteproc/pru_rproc.h
++index 614424576323..b24e8cbb386e 100644
++--- a/drivers/remoteproc/pru_rproc.h
+++++ b/drivers/remoteproc/pru_rproc.h
++@@ -45,7 +45,8 @@
++  */
++ enum pruss_rsc_types {
++ 	PRUSS_RSC_INTRS	= 1,
++-	PRUSS_RSC_MAX	= 2,
+++	PRUSS_RSC_DMA	= 2,
+++	PRUSS_RSC_MAX	= 3,
++ };
++ 
++ /**
++-- 
++2.14.1
++
+-- 
+2.14.1
+
