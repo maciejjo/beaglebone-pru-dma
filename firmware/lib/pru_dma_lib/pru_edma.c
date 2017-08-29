@@ -70,6 +70,37 @@ void edma_setup(volatile uint32_t *edma_ptr, edma_data *edma_buf)
 	*pParams = params;
 }
 
+void edma_set_buffer(volatile uint32_t *edma_ptr, edma_data *edma_buf)
+{
+	edmaParam params;
+	uint16_t paramOffset;
+	volatile edmaParam *pParams;
+
+	/* Setup and store PaRAM set for transfer */
+	paramOffset = PARAM_OFFSET;
+
+	/* Move paramOffset to appropriate PaRAM slot  */
+	paramOffset += ((edma_buf->slot << 5) / 4);
+
+	params.lnkrld.link = 0xFFFF;
+	params.lnkrld.bcntrld = 0x0000;
+	params.opt.tcc = edma_buf->chan;
+	params.opt.tcinten = 1;
+	params.opt.itcchen = 1;
+
+	params.abcnt.acnt = edma_buf->size * sizeof(uint32_t);
+	params.abcnt.bcnt = BCNT;
+	params.ccnt.ccnt = CCNT;
+	params.bidx.srcbidx = 0x1;
+	params.bidx.dstbidx = 0x1;
+	params.src = edma_buf->src;
+	params.dst = edma_buf->dst;
+
+	pParams = (volatile edmaParam *)(edma_ptr + paramOffset);
+	*pParams = params;
+}
+
+
 /*
  * Trigger transfer (must be configured using edma_setup first)
  *
