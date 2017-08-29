@@ -9,6 +9,8 @@
 struct pru_dma_hcsr04 {
 	struct device *dev;
 	struct pru_dma *pru_dma;
+	uint32_t *dma_buf;
+	uint32_t dma_buf_size;
 };
 
 static ssize_t pru_dma_hcsr04_tx_store(struct device *dev,
@@ -18,11 +20,11 @@ static ssize_t pru_dma_hcsr04_tx_store(struct device *dev,
 	struct pru_dma_hcsr04 *pru_dma_hcsr04 =
 		platform_get_drvdata(to_platform_device(dev));
 
-	ret = pru_dma_tx_trigger(pru_dma_hcsr04->pru_dma);
+	ret = pru_dma_tx_trigger(pru_dma_hcsr04->pru_dma, 0);
 	if (ret)
 		return ret;
 
-	dev_err(pru_dma_hcsr04->dev, "Tx triggered.\n");
+	dev_dbg(pru_dma_hcsr04->dev, "Tx triggered.\n");
 
 	return count;
 }
@@ -32,8 +34,6 @@ static DEVICE_ATTR(tx, S_IWUSR, NULL, pru_dma_hcsr04_tx_store);
 static ssize_t pru_dma_hcsr04_buf_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	uint32_t *dma_buf;
-	uint32_t dma_buf_size;
 	int i;
 	int len = 0;
 	uint32_t mean = 0;
@@ -41,18 +41,15 @@ static ssize_t pru_dma_hcsr04_buf_show(struct device *dev,
 	struct pru_dma_hcsr04 *pru_dma_hcsr04 =
 		platform_get_drvdata(to_platform_device(dev));
 
-	pru_dma_tx_completion_wait(pru_dma_hcsr04->pru_dma);
+	pru_dma_tx_completion_wait(pru_dma_hcsr04->pru_dma, 0);
 
-	dma_buf = pru_dma_get_buffer(pru_dma_hcsr04->pru_dma);
-	dma_buf_size = pru_dma_get_buffer_size(pru_dma_hcsr04->pru_dma);
+	dev_dbg(pru_dma_hcsr04->dev, "Buffer obtained.\n");
 
-	dev_err(pru_dma_hcsr04->dev, "Buffer obtained.\n");
-
-	for (i = 0; i < dma_buf_size; i++)
-		mean += *(dma_buf + i);
+	for (i = 0; i < pru_dma_hcsr04->dma_buf_size; i++)
+		mean += *(pru_dma_hcsr04->dma_buf + i);
 
 	mean *= 1000;
-	mean /= (291 * 2 * dma_buf_size);
+	mean /= (291 * 2 * pru_dma_hcsr04->dma_buf_size);
 
 	len = sprintf(buf, "%umm\n", mean);
 
@@ -92,15 +89,16 @@ int pru_dma_hcsr04_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	dev_err(pru_dma_hcsr04->dev, "Got PRU DMA handle!.\n");
+	dev_dbg(pru_dma_hcsr04->dev, "Got PRU DMA handle!.\n");
 
-	ret = pru_dma_map_buffer(pru_dma_hcsr04->pru_dma);
-	if (ret) {
-		dev_err(pru_dma_hcsr04->dev, "Ret = %d!.\n", ret);
+	pru_dma_hcsr04->dma_buf = pru_dma_get_buffer(pru_dma_hcsr04->pru_dma, 0);
+	if (IS_ERR(pru_dma_hcsr04->dma_buf)) {
+		ret = PTR_ERR(pru_dma_hcsr04->dma_buf);
+		dev_err(pru_dma_hcsr04->dev, "Unable to get DMA buffer.\n");
 		return ret;
 	}
 
-	dev_err(pru_dma_hcsr04->dev, "Mapped buffer!.\n");
+	pru_dma_hcsr04->dma_buf_size = pru_dma_get_buffer_size(pru_dma_hcsr04->pru_dma, 0);
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &pru_dma_hcsr04_group);
 	if (ret) {
@@ -117,11 +115,11 @@ int pru_dma_hcsr04_remove(struct platform_device *pdev)
 {
 	struct pru_dma_hcsr04 *pru_dma_hcsr04 = dev_get_drvdata(&pdev->dev);
 
-	pru_dma_unmap_buffer(pru_dma_hcsr04->pru_dma);
+	pru_dma_unmap_buffer(pru_dma_hcsr04->pru_dma, 0);
 
 	sysfs_remove_group(&pdev->dev.kobj, &pru_dma_hcsr04_group);
 
-	dev_err(pru_dma_hcsr04->dev, "Unmapped buffer.\n");
+	dev_dbg(pru_dma_hcsr04->dev, "Unmapped buffer.\n");
 	return 0;
 }
 

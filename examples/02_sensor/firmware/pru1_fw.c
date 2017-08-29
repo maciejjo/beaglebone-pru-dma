@@ -16,14 +16,13 @@ void main(void)
 	/* Clear SYSCFG[STANDBY_INIT] to enable OCP master port */
 	CT_CFG.SYSCFG_bit.STANDBY_INIT = 0;
 
-	while (1) {
+	pru_dma_init(&dma_data,
+			PRU_DMA_DIR_ARM_TO_PRU,
+			&resourceTable.pru_dmas.rsc.pru_dma,
+			0
+			);
 
-		pru_dma_init(&dma_data,
-				PRU_DMA_DIR_PRU_TO_ARM,
-				&resourceTable.rpmsg_vdev,
-				&resourceTable.rpmsg_vring0,
-				&resourceTable.rpmsg_vring1
-				);
+	while (1) {
 
 		src = (uint32_t *) dma_data.src;
 
@@ -31,6 +30,7 @@ void main(void)
 			*(src + i) = (uint32_t) hc_sr04_measure_pulse();
 		}
 
+		pru_dma_wait_host();
 		pru_dma_trigger();
 		pru_dma_wait();
 	}

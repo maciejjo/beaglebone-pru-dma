@@ -59,8 +59,8 @@
 /* Mapping sysevts to a channel. Each pair contains a sysevt, channel. */
 struct ch_map pru_intc_map[] = {
 	{63, 0}, // Map system event 63 (tpcc_int_pend_po1) to channel 0
-	{18, 3}, // Map sysevt 18 (PRU1 vring) to channel 3 (PRU->ARM)
-	{19, 1}, // Mam sysevt 19 (PRU1 kick) to channel 1 (ARM->PRU)
+	{23, 1}, // Mam sysevt 23 to channel 1 (ARM->PRU)
+	{22, 2}, // Map sysevt 22 to channel 2 (PRU->ARM)
 };
 
 struct my_resource_table {
@@ -68,13 +68,9 @@ struct my_resource_table {
 
 	uint32_t offset[2];
 
-	/* rpmsg vdev entry */
-	struct fw_rsc_vdev rpmsg_vdev;
-	struct fw_rsc_vdev_vring rpmsg_vring0;
-	struct fw_rsc_vdev_vring rpmsg_vring1;
-
 	/* intc definition */
 	struct fw_rsc_custom pru_ints;
+	struct fw_rsc_custom pru_dmas;
 };
 
 #pragma DATA_SECTION(resourceTable, ".resource_table")
@@ -85,43 +81,13 @@ struct my_resource_table resourceTable = {
 	0, 0,	/* reserved, must be zero */
 	/* offsets to entries */
 	{
-		offsetof(struct my_resource_table, rpmsg_vdev),
 		offsetof(struct my_resource_table, pru_ints),
+		offsetof(struct my_resource_table, pru_dmas),
 	},
-
-	/* rpmsg vdev entry */
-	{
-		(uint32_t)TYPE_VDEV,                    //type
-		(uint32_t)VIRTIO_ID_RPMSG,              //id
-		(uint32_t)0,                            //notifyid
-		(uint32_t)RPMSG_PRU_C0_FEATURES,	//dfeatures
-		(uint32_t)0,                            //gfeatures
-		(uint32_t)0,                            //config_len
-		(uint8_t)0,                             //status
-		(uint8_t)2,                             //num_of_vrings, only two is supported
-		{ (uint8_t)0, (uint8_t)0 },             //reserved
-		/* no config data */
-	},
-	/* the two vrings */
-	{
-		0,                      //da, will be populated by host, can't pass it in
-		16,                     //align (bytes),
-		PRU_RPMSG_VQ0_SIZE,     //num of descriptors
-		0,                      //notifyid, will be populated, can't pass right now
-		0                       //reserved
-	},
-	{
-		0,                      //da, will be populated by host, can't pass it in
-		16,                     //align (bytes),
-		PRU_RPMSG_VQ1_SIZE,     //num of descriptors
-		0,                      //notifyid, will be populated, can't pass right now
-		0                       //reserved
-	},
-
 
 	/* INTC table */
 	{
-		TYPE_CUSTOM, TYPE_PRU_INTS,
+		TYPE_CUSTOM_POST, TYPE_PRU_INTS,
 		sizeof(struct fw_rsc_custom_ints),
 		{ /* PRU_INTS version */
 			0x0000,
@@ -129,12 +95,25 @@ struct my_resource_table resourceTable = {
 			// Map channel 0 to Host-0 (bit 30 in R31)
 			// Map channel 1 to Host-1 (bit 31 in R31)      - for RPMsg
 			// Map channel 3 to Host-3 (PRU->ARM interrupt) - for RPMsg
-			0,           1          , HOST_UNUSED, 3          , HOST_UNUSED,
+			0,           1          , 2          , HOST_UNUSED, HOST_UNUSED,
 			HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED,
 			/* Number of evts being mapped to channels */
 			(sizeof(pru_intc_map) / sizeof(struct ch_map)),
 			/* Pointer to the structure containing mapped events */
 			pru_intc_map,
+		},
+	},
+	/* PRU DMA entry */
+	{
+		TYPE_CUSTOM_PRE, TYPE_PRU_DMA,
+		sizeof(struct fw_rsc_custom_dma_ch),
+		.rsc.pru_dma = {
+			// Version number
+			0x0000,
+			1,
+			{
+			{0, 100, 12, 200, 1},
+			},
 		},
 	},
 };

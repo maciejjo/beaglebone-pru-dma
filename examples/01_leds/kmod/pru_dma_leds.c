@@ -18,11 +18,11 @@ static ssize_t pru_dma_leds_tx_store(struct device *dev,
 	struct pru_dma_leds *pru_dma_leds =
 		platform_get_drvdata(to_platform_device(dev));
 
-	ret = pru_dma_tx_trigger(pru_dma_leds->pru_dma);
+	ret = pru_dma_tx_trigger(pru_dma_leds->pru_dma, 0);
 	if (ret)
 		return ret;
 
-	dev_err(pru_dma_leds->dev, "Tx triggered.\n");
+	dev_dbg(pru_dma_leds->dev, "Tx triggered.\n");
 
 	return count;
 }
@@ -70,23 +70,21 @@ int pru_dma_leds_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	dev_err(pru_dma_leds->dev, "Got PRU DMA handle!.\n");
+	dev_dbg(pru_dma_leds->dev, "Got PRU DMA handle!.\n");
 
-	buf = pru_dma_get_buffer(pru_dma_leds->pru_dma);
-	dev_err(pru_dma_leds->dev, "Got buffer @ 0x%.8x!.\n", buf);
-	buf_size = pru_dma_get_buffer_size(pru_dma_leds->pru_dma);
-	dev_err(pru_dma_leds->dev, "Got buffer size - 0x%.8x!.\n", buf_size);
-
-	leds_pattern_generate(buf, buf_size);
-
-	ret = pru_dma_map_buffer(pru_dma_leds->pru_dma);
-	if (ret) {
-		dev_err(pru_dma_leds->dev, "Ret = %d!.\n", ret);
+	buf = pru_dma_get_buffer(pru_dma_leds->pru_dma, 0);
+	if (IS_ERR(buf)) {
+		ret = PTR_ERR(buf);
+		if (ret != -EPROBE_DEFER)
+			dev_err(pru_dma_leds->dev, "Unable to get DMA buffer.\n");
 		return ret;
 	}
 
+	buf_size = pru_dma_get_buffer_size(pru_dma_leds->pru_dma, 0);
 
-	dev_err(pru_dma_leds->dev, "Mapped buffer!.\n");
+	leds_pattern_generate(buf, buf_size);
+
+	dev_dbg(pru_dma_leds->dev, "Mapped buffer!.\n");
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &pru_dma_leds_group);
 	if (ret) {
@@ -103,11 +101,11 @@ int pru_dma_leds_remove(struct platform_device *pdev)
 {
 	struct pru_dma_leds *pru_dma_leds = dev_get_drvdata(&pdev->dev);
 
-	pru_dma_unmap_buffer(pru_dma_leds->pru_dma);
+	pru_dma_unmap_buffer(pru_dma_leds->pru_dma, 0);
 
 	sysfs_remove_group(&pdev->dev.kobj, &pru_dma_leds_group);
 
-	dev_err(pru_dma_leds->dev, "Unmapped buffer.\n");
+	dev_dbg(pru_dma_leds->dev, "Unmapped buffer.\n");
 	return 0;
 }
 

@@ -15,22 +15,19 @@ void main(void)
 	/* Clear SYSCFG[STANDBY_INIT] to enable OCP master port */
 	CT_CFG.SYSCFG_bit.STANDBY_INIT = 0;
 
+	pru_dma_init(&dma_data,
+			PRU_DMA_DIR_ARM_TO_PRU,
+			&resourceTable.pru_dmas.rsc.pru_dma,
+			0
+			);
+
+	/* Poitner to destination buffer for pattern testing */
+	dst = (uint32_t *) dma_data.dst;
+
 	while (1) {
 
 		/* Clear all GPO pins */
 		__R30 = 0x00;
-
-		pru_dma_init(&dma_data,
-				PRU_DMA_DIR_ARM_TO_PRU,
-				&resourceTable.rpmsg_vdev,
-				&resourceTable.rpmsg_vring0,
-				&resourceTable.rpmsg_vring1,
-				&resourceTable.pru_dmas,
-				0
-				);
-
-		/* Poitner to destination buffer for pattern testing */
-		dst = (uint32_t *) dma_data.dst;
 
 		pru_dma_wait_host();
 

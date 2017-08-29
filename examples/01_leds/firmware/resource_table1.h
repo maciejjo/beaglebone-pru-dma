@@ -38,45 +38,25 @@
 #include <rsc_types.h>
 #include "pru_virtio_ids.h"
 
-/*
- * Sizes of the virtqueues (expressed in number of buffers supported,
- * and must be power of 2)
- */
-#define PRU_RPMSG_VQ0_SIZE	16
-#define PRU_RPMSG_VQ1_SIZE	16
-
-/*
- * The feature bitmap for virtio rpmsg
- */
-#define VIRTIO_RPMSG_F_NS	0		//name service notifications
-
-/* This firmware supports name service notifications as one of its features */
-#define RPMSG_PRU_C0_FEATURES	(1 << VIRTIO_RPMSG_F_NS)
-
 /* Definition for unused interrupts */
 #define HOST_UNUSED		255
 
 /* Mapping sysevts to a channel. Each pair contains a sysevt, channel. */
 struct ch_map pru_intc_map[] = {
 	{63, 0}, // Map system event 63 (tpcc_int_pend_po1) to channel 0
-	{18, 3}, // Map sysevt 18 (PRU1 vring) to channel 3 (PRU->ARM)
-	{19, 1}, // Mam sysevt 19 (PRU1 kick) to channel 1 (ARM->PRU)
+	{23, 1}, // Mam sysevt 23 to channel 1 (ARM->PRU)
+	{22, 2}, // Map sysevt 22 to channel 2 (PRU->ARM)
 };
 
 struct dma_ch pru_dma_ch[] = {
 	/* buffer address (filled by host), EDMA channel, EDMA PaRAM slot, buffer size, completion */
-	{0, 12, 200, 100, 0},
+	{0, 100, 12, 200, 0},
 };
 
 struct my_resource_table {
 	struct resource_table base;
 
-	uint32_t offset[3];
-
-	/* rpmsg vdev entry */
-	struct fw_rsc_vdev rpmsg_vdev;
-	struct fw_rsc_vdev_vring rpmsg_vring0;
-	struct fw_rsc_vdev_vring rpmsg_vring1;
+	uint32_t offset[2];
 
 	/* intc definition */
 	struct fw_rsc_custom pru_ints;
@@ -87,44 +67,13 @@ struct my_resource_table {
 #pragma RETAIN(resourceTable)
 struct my_resource_table resourceTable = {
 	1,	/* Resource table version: only version 1 is supported by the current driver */
-	3,	/* number of entries in the table */
+	2,	/* number of entries in the table */
 	0, 0,	/* reserved, must be zero */
 	/* offsets to entries */
 	{
-		offsetof(struct my_resource_table, rpmsg_vdev),
 		offsetof(struct my_resource_table, pru_ints),
 		offsetof(struct my_resource_table, pru_dmas),
 	},
-
-	/* rpmsg vdev entry */
-	{
-		(uint32_t)TYPE_VDEV,                    //type
-		(uint32_t)VIRTIO_ID_RPMSG,              //id
-		(uint32_t)0,                            //notifyid
-		(uint32_t)RPMSG_PRU_C0_FEATURES,	//dfeatures
-		(uint32_t)0,                            //gfeatures
-		(uint32_t)0,                            //config_len
-		(uint8_t)0,                             //status
-		(uint8_t)2,                             //num_of_vrings, only two is supported
-		{ (uint8_t)0, (uint8_t)0 },             //reserved
-		/* no config data */
-	},
-	/* the two vrings */
-	{
-		0,                      //da, will be populated by host, can't pass it in
-		16,                     //align (bytes),
-		PRU_RPMSG_VQ0_SIZE,     //num of descriptors
-		0,                      //notifyid, will be populated, can't pass right now
-		0                       //reserved
-	},
-	{
-		0,                      //da, will be populated by host, can't pass it in
-		16,                     //align (bytes),
-		PRU_RPMSG_VQ1_SIZE,     //num of descriptors
-		0,                      //notifyid, will be populated, can't pass right now
-		0                       //reserved
-	},
-
 
 	/* INTC table */
 	{
@@ -136,7 +85,7 @@ struct my_resource_table resourceTable = {
 			// Map channel 0 to Host-0 (bit 30 in R31)
 			// Map channel 1 to Host-1 (bit 31 in R31)      - for RPMsg
 			// Map channel 3 to Host-3 (PRU->ARM interrupt) - for RPMsg
-			0,           1          , HOST_UNUSED, 3          , HOST_UNUSED,
+			0,           1,           2          , HOST_UNUSED, HOST_UNUSED,
 			HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED, HOST_UNUSED,
 			/* Number of evts being mapped to channels */
 			(sizeof(pru_intc_map) / sizeof(struct ch_map)),
@@ -152,7 +101,9 @@ struct my_resource_table resourceTable = {
 			// Version number
 			0x0000,
 			1,
-			pru_dma_ch,
+			{
+			{0, 100, 12, 200, 0},
+			},
 		},
 	},
 };
