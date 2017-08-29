@@ -8,6 +8,9 @@
 #define CHECK_EVT(e) ((e < 32) ? (CT_INTC.SECR0 & (1U << e)) : (CT_INTC.SECR1 & (1U << (e - 32))))
 #define CLEAR_EVT(e) ((e < 32) ? (CT_INTC.SECR0 = (1U << e)) : (CT_INTC.SECR1 = (1U << (e - 32))))
 
+#define SIGNAL_EVENT(x) \
+	__R31 = (1 << 5) | ((x) - 16); \
+
 #define PRU_SHMEM_OFFSET (0x4A310000)
 
 volatile register uint32_t __R30;

@@ -6,8 +6,8 @@
 #include <pru_types.h>
 
 #define EVT_FROM_EDMA 			63
-#define EVT_TO_ARM_HOST			18
-#define EVT_FROM_ARM_HOST		19
+#define EVT_TO_ARM_HOST			22
+#define EVT_FROM_ARM_HOST		23
 
 #define HOST0_INT			((uint32_t) 1 << 30)
 #define HOST1_INT			((uint32_t) 1 << 31)
@@ -25,9 +25,10 @@ enum pru_dma_direction {
 
 void pru_dma_init(struct pru_dma_data *dma_data,
 			enum pru_dma_direction dir,
-			struct fw_rsc_vdev *rpmsg_vdev,
-			struct fw_rsc_vdev_vring *rpmsg_vring0,
-			struct fw_rsc_vdev_vring *rpmsg_vring1,
+			struct fw_rsc_custom_dma_ch *pru_dmas,
+			int chan_num);
+void pru_dma_set_dir(struct pru_dma_data *dma_data,
+			enum pru_dma_direction dir,
 			struct fw_rsc_custom_dma_ch *pru_dmas,
 			int chan_num);
 void pru_dma_wait_host();
