@@ -87,7 +87,7 @@ struct my_resource_table resourceTable = {
 
 	/* INTC table */
 	{
-		TYPE_CUSTOM_POST, TYPE_PRU_INTS,
+		TYPE_CUSTOM, TYPE_PRU_INTS,
 		sizeof(struct fw_rsc_custom_ints),
 		{ /* PRU_INTS version */
 			0x0000,
@@ -105,7 +105,7 @@ struct my_resource_table resourceTable = {
 	},
 	/* PRU DMA entry */
 	{
-		TYPE_CUSTOM_PRE, TYPE_PRU_DMA,
+		TYPE_CUSTOM, TYPE_PRU_DMA,
 		sizeof(struct fw_rsc_custom_dma_ch),
 		.rsc.pru_dma = {
 			// Version number
