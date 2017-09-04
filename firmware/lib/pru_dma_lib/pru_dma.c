@@ -54,6 +54,8 @@ void pru_dma_init(struct pru_dma_data *dma_data,
 	dma_data->src = cd.edma_buf.src;
 	dma_data->dst = cd.edma_buf.dst;
 	dma_data->size = cd.edma_buf.size;
+
+	CT_INTC.SICR_bit.STS_CLR_IDX = EVT_FROM_ARM_HOST;
 }
 
 void pru_dma_set_dir(struct pru_dma_data *dma_data,
@@ -81,7 +83,6 @@ void pru_dma_set_dir(struct pru_dma_data *dma_data,
 
 void pru_dma_wait_host()
 {
-	CT_INTC.SICR_bit.STS_CLR_IDX = EVT_FROM_ARM_HOST;
 
 	while (!(__R31 & HOST1_INT))
 		;
