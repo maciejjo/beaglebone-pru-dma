@@ -52,18 +52,24 @@ Following scenario is implemented:
    mechanism
 
 ## Project structure
+ 
+ - *firmware* - code for PRU software. Receives transfer parameters via resource table,
+   configures EDMA for transfer and INTC to trigger event on EDMA interrupt
 
- - *kmod* - kernel module, responsible for allocation and mapping of linux-side
-   DMA buffer and passing parameters to PRU firmware via rpmsg.
+ - *kernel-patch* - kernel-side implementation of the project, contains patches
+   to ti-linux-kernel-dev repository (based on 4.9.36-ti-r46 release)
+ 
+ - *pru-swpkg-patch* - contains patch that needs to be applied to pru software support
+   package (based on v5.1.0 release)
 
- - *firmware* - code for PRU software. Receives transfer parameters via rpmsg,
-   configures EDMA for transfer and INTC to trigger event on EDMA interrupt.
-
- - *dts* - device tree overlay needed to run the code. Contains EDMA
-   configuration parameters (channel number, PaRAM slot).
+ - *dts* - basic device tree overlay needed to load the module. More concrete dt
+   overlays exist for each example
 
  - *examples* - every subdirectory is an example usage of pru-dma, demonstrating
-   practical application.
+   practical application, consisting of PRU firmware, kernel module and dt overlay
+
+ - *Documentation* - contains detailed description of the project, build instructions
+   and description of API for PRU firmware and kernel modules
 
  - *wip* - (work in progress) isolated examples created to test specific
    features (e.g. linux DMA API, PRU-ARM communication), not an essential part
