@@ -75,5 +75,9 @@ Following scenario is implemented:
    features (e.g. linux DMA API, PRU-ARM communication), not an essential part
    of the project.
 
+## Demonstration video
+
+[![BeagleBone PRU DMA - Final presentation](https://img.youtube.com/vi/uG6ZjZu9m8E/0.jpg)](https://www.youtube.com/watch?v=uG6ZjZu9m8E) 
+
 [1]: https://summerofcode.withgoogle.com/projects/#5021339281784832
 [2]: https://beagleboard.org/
