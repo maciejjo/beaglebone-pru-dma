@@ -27,6 +27,7 @@ void pru_dma_init(struct pru_dma_data *dma_data,
 			enum pru_dma_direction dir,
 			struct fw_rsc_custom_dma_ch *pru_dmas,
 			int chan_num);
+
 void pru_dma_set_dir(struct pru_dma_data *dma_data,
 			enum pru_dma_direction dir,
 			struct fw_rsc_custom_dma_ch *pru_dmas,
