@@ -1,4 +1,4 @@
-From 8fc33f4ab574bd28404b9f0ef146d2aee1b96716 Mon Sep 17 00:00:00 2001
+From ee474054d923cc5222a75839c035df3e6d34472b Mon Sep 17 00:00:00 2001
 From: Maciej Sobkowski <maciej@sobkow.ski>
 Date: Wed, 16 Aug 2017 17:01:45 +0200
 Subject: [PATCH 3/3] Add parsing of PRU_DMA resource type to pru_rproc

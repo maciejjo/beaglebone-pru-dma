@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2017 Maciej Sobkowski <maciej@sobkow.ski>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
 #include "pru_defs.h"
 #include "pru_edma.h"
 #include <pru_intc.h>

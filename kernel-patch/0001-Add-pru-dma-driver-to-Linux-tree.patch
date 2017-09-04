@@ -1,4 +1,4 @@
-From 59096a51bc2f05452c1f7c443c257d35f109f41c Mon Sep 17 00:00:00 2001
+From a8fe86fb19e224d1e709b2f78a6a1e28dc9f3a3a Mon Sep 17 00:00:00 2001
 From: Maciej Sobkowski <maciej@sobkow.ski>
 Date: Wed, 16 Aug 2017 16:49:43 +0200
 Subject: [PATCH 1/3] Add pru-dma driver to Linux tree
@@ -10,9 +10,9 @@ configuration from firmware resource table.
 Signed-off-by: Maciej Sobkowski <maciej@sobkow.ski>
 ---
  drivers/remoteproc/Makefile  |   2 +-
- drivers/remoteproc/pru_dma.c | 287 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/remoteproc/pru_dma.c | 306 +++++++++++++++++++++++++++++++++++++++++++
  include/linux/pru_dma.h      |  20 +++
- 3 files changed, 308 insertions(+), 1 deletion(-)
+ 3 files changed, 327 insertions(+), 1 deletion(-)
  create mode 100644 drivers/remoteproc/pru_dma.c
  create mode 100644 include/linux/pru_dma.h
 
@@ -31,10 +31,25 @@ index 8488f70ed605..bfa227dcbc5c 100644
  obj-$(CONFIG_QCOM_MDT_LOADER)		+= qcom_mdt_loader.o
 diff --git a/drivers/remoteproc/pru_dma.c b/drivers/remoteproc/pru_dma.c
 new file mode 100644
-index 000000000000..e40a8ddd5a1c
+index 000000000000..1ac3b935e2a3
 --- /dev/null
 +++ b/drivers/remoteproc/pru_dma.c
-@@ -0,0 +1,287 @@
+@@ -0,0 +1,306 @@
++/*
++ * PRU DMA - driver for communicating with PRU firmware using pru-dma library
++ *
++ * Copyright (C) 2017 Maciej Sobkowski <maciej@sobkow.ski>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
 +#include <linux/module.h>
 +#include <linux/init.h>
 +#include <linux/pruss.h>
@@ -148,6 +163,10 @@ index 000000000000..e40a8ddd5a1c
 +	pru_dma->buffers[buf_num].kbuf_size = buf_size;
 +	pru_dma->buffers[buf_num].configured = 1;
 +
++	if (pru_dma->buffers[buf_num].notify)
++		init_completion(&pru_dma->buffers[buf_num].tx_complete);
++
++
 +	return 0;
 +}
 +EXPORT_SYMBOL_GPL(pru_dma_buffer_setup);
@@ -158,7 +177,7 @@ index 000000000000..e40a8ddd5a1c
 +	pruss_intc_trigger(pru_dma->irq_to_pru);
 +
 +	if (pru_dma->buffers[buf_num].notify)
-+		init_completion(&pru_dma->buffers[buf_num].tx_complete);
++		reinit_completion(&pru_dma->buffers[buf_num].tx_complete);
 +
 +	return 0;
 +}
@@ -321,7 +340,7 @@ index 000000000000..e40a8ddd5a1c
 +
 +MODULE_DESCRIPTION("PRU DMA driver");
 +MODULE_AUTHOR("Maciej Sobkowski");
-+MODULE_LICENSE("GPL");
++MODULE_LICENSE("GPL v2");
 diff --git a/include/linux/pru_dma.h b/include/linux/pru_dma.h
 new file mode 100644
 index 000000000000..040337b2c346

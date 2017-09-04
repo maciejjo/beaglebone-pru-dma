@@ -1,4 +1,4 @@
-From a9f0668e478347eafa537fc3d4bbc216ed8438cf Mon Sep 17 00:00:00 2001
+From 6077e79f5da85c8c3da4677f487bb1ba8dd21cb6 Mon Sep 17 00:00:00 2001
 From: Maciej Sobkowski <maciej@sobkow.ski>
 Date: Wed, 16 Aug 2017 17:01:19 +0200
 Subject: [PATCH 2/3] Add new resource structures for pru dma

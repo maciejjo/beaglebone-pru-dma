@@ -1,4 +1,7 @@
 /*
+ * Source Modified by Maciej Sobkowski <maciej@sobkow.ski>
+ * Based on the examples distributed by TI
+ *
  * Copyright (C) 2015 Texas Instruments Incorporated - http://www.ti.com/
  *
  *
