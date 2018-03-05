@@ -77,6 +77,9 @@ before_script:
   - tar xf ${ROOT_DIR}/${DL_DIR}/linux.tar.gz -C ${ROOT_DIR}/${KERNEL_DST} --strip-components 1
   - cd ${ROOT_DIR}/${KERNEL_DST}
   - export LOCALVERSION="-${KERNEL_VERSION}"
+  - patch -p1 < ${ROOT_DIR}/kernel-patch/0001-Add-pru-dma-driver-to-Linux-tree.patch
+  - patch -p1 < ${ROOT_DIR}/kernel-patch/0002-Add-new-resource-structures-for-pru-dma.patch
+  - patch -p1 < ${ROOT_DIR}/kernel-patch/0003-Add-parsing-of-PRU_DMA-resource-type-to-pru_rproc.patch
   - $ARM_MAKE -j${MAKE_JOBS} mrproper
   - $ARM_MAKE bb.org_defconfig
   - $ARM_MAKE -j${MAKE_JOBS} modules_prepare
