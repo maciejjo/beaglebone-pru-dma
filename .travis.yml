@@ -18,7 +18,8 @@ before_install:
   - export DTC_VERSION="1.4.4"
   - export DTC_DST="dtc"
 
-  - export TOOLCHAIN_VERSION="6.3.1-2017.05"
+  - export TOOLCHAIN_VERSION="7.2.1-2017.11"
+    exprot TOOLCHAIN_LOCATION="7.2-2017.11"
   - export TOOLCHAIN_DST="toolchain"
 
   - export MAKE_JOBS="4"
@@ -34,7 +35,7 @@ before_install:
   - wget -O "${ROOT_DIR}/${DL_DIR}/pru-swpkg.tar.gz"  "http://git.ti.com/pru-software-support-package/pru-software-support-package/archive-tarball/${TI_PRU_SWPKG_VERSION}"
   - wget -O "${ROOT_DIR}/${DL_DIR}/linux.tar.gz"      "https://github.com/${KERNEL_REPO}/archive/${KERNEL_BRANCH}-${KERNEL_VERSION}.tar.gz"
   - wget -O "${ROOT_DIR}/${DL_DIR}/dtc.tar.gz"        "https://git.kernel.org/pub/scm/utils/dtc/dtc.git/snapshot/dtc-${DTC_VERSION}.tar.gz"
-  - wget -O "${ROOT_DIR}/${DL_DIR}/toolchain.tar.xz"  "https://releases.linaro.org/components/toolchain/binaries/latest/arm-linux-gnueabihf/gcc-linaro-${TOOLCHAIN_VERSION}-x86_64_arm-linux-gnueabihf.tar.xz"
+  - wget -O "${ROOT_DIR}/${DL_DIR}/toolchain.tar.xz"  "https://releases.linaro.org/components/toolchain/binaries/${TOOLCHAIN_LOCATION}/arm-linux-gnueabihf/gcc-linaro-${TOOLCHAIN_VERSION}-x86_64_arm-linux-gnueabihf.tar.xz"
 ########################################
 
 # Install required packages ############
