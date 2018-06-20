@@ -7,22 +7,22 @@ before_install:
 
   - export TI_PRU_CGT_VERSION="2.2.1"
   - export TI_PRU_CGT_DST="ti-pru-cgt"
+
   - export TI_PRU_SWPKG_VERSION="v5.1.0"
   - export TI_PRU_SWPKG_DST="pru-swpkg"
 
   - export KERNEL_REPO="beagleboard/linux"
-  - export KERNEL_BRANCH="4.9.36"
-  - export KERNEL_VERSION="ti-r46"
+  - export KERNEL_BRANCH="4.9.105"
+  - export KERNEL_VERSION="ti-r113"
   - export KERNEL_DST="linux"
 
-  - export DTC_VERSION="1.4.4"
+  - export DTC_VERSION="1.4.6"
   - export DTC_DST="dtc"
 
-  - export TOOLCHAIN_VERSION="7.2.1-2017.11"
-    exprot TOOLCHAIN_LOCATION="7.2-2017.11"
+  - export TOOLCHAIN_VERSION="7.3.1-2018.05"
+    exprot TOOLCHAIN_LOCATION="7.3-2018.05"
   - export TOOLCHAIN_DST="toolchain"
 
-  - export MAKE_JOBS="4"
   - export ARM_MAKE="make CROSS_COMPILE=arm-linux-gnueabihf- ARCH=arm"
 
   - export ROOT_DIR=${PWD}
@@ -80,9 +80,9 @@ before_script:
   - patch -p1 < ${ROOT_DIR}/kernel-patch/0001-Add-pru-dma-driver-to-Linux-tree.patch
   - patch -p1 < ${ROOT_DIR}/kernel-patch/0002-Add-new-resource-structures-for-pru-dma.patch
   - patch -p1 < ${ROOT_DIR}/kernel-patch/0003-Add-parsing-of-PRU_DMA-resource-type-to-pru_rproc.patch
-  - $ARM_MAKE -j${MAKE_JOBS} mrproper
+  - $ARM_MAKE -j$(nproc) mrproper
   - $ARM_MAKE bb.org_defconfig
-  - $ARM_MAKE -j${MAKE_JOBS} modules_prepare
+  - $ARM_MAKE -j$(nproc) modules_prepare
 ########################################
 
 script:
